@@ -1,57 +1,36 @@
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Window, WindowId};
+use minifb::{Key, Window, WindowOptions};
 
-#[derive(Default)]
-struct App {
-    window: Option<Window>,
-}
-
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        match event {
-            WindowEvent::CloseRequested => {
-                println!("The close button was pressed; stopping");
-                event_loop.exit();
-            },
-            WindowEvent::RedrawRequested => {
-                // Redraw the application.
-                //
-                // It's preferable for applications that do not render continuously to render in
-                // this event rather than in AboutToWait, since rendering in here allows
-                // the program to gracefully handle redraws requested by the OS.
-
-                // Draw.
-
-                // Queue a RedrawRequested event.
-                //
-                // You only need to call this if you've determined that you need to redraw in
-                // applications which do not always need to. Applications that redraw continuously
-                // can render here instead.
-                self.window.as_ref().unwrap().request_redraw();
-            }
-            _ => (),
-        }
-    }
-}
+const WIDTH: usize = 640;
+const HEIGHT: usize = 360;
 
 fn main() {
-    let event_loop = EventLoop::new().unwrap();
+    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
-    // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
-    // dispatched any events. This is ideal for games and similar applications.
-    event_loop.set_control_flow(ControlFlow::Poll);
+    let mut window = Window::new(
+        "Test - ESC to exit",
+        WIDTH,
+        HEIGHT,
+        WindowOptions::default(),
+    )
+    .unwrap_or_else(|e| {
+        panic!("{}", e);
+    });
 
-    // ControlFlow::Wait pauses the event loop if no events are available to process.
-    // This is ideal for non-game applications that only update in response to user
-    // input, and uses significantly less power/CPU time than ControlFlow::Poll.
-    event_loop.set_control_flow(ControlFlow::Wait);
+    // Limit to max ~60 fps update rate
+    window.set_target_fps(60);
 
-    let mut app = App::default();
-    event_loop.run_app(&mut app);
+    let mut count = 0;
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        count = 0;
+        for i in buffer.iter_mut() {
+            count += 1;
+            let grayscale = (count % 127) + 127 as u32; // Calculate the grayscale value (0-254)
+            *i = (grayscale << 16) | (grayscale << 8) | grayscale; // Set RGB to the same value
+        }
+
+        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
+        window
+            .update_with_buffer(&buffer, WIDTH, HEIGHT)
+            .unwrap();
+    }
 }
