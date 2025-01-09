@@ -1,5 +1,3 @@
-use crate::WIDTH;
-
 
 pub struct Line{
     pub x1: f64,
@@ -30,11 +28,6 @@ impl Line {
         // add bounds checks later
 
         // assume we have integer inputs and strokewidth = 1 rn
-
-        let mut x_float: f64;
-        let mut y_float: f64;
-        let mut index: i64;
-
         let mut x: i64;
         let mut y: i64;
 
