@@ -1,4 +1,5 @@
 use crate::world_element::WorldElement;
+use crate::view::View;
 
 pub struct World{
     pub height: i64,
@@ -16,14 +17,16 @@ impl World{
     ) -> World {
         let elements: Vec<WorldElement> = Vec::new();
         World {
-            height, width, depth, elements,
+            height, width, depth, elements
         }
     }
 
     // renders as is from the pov of the 
     pub fn render(&self, buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
-
-       buffer[20000] = 0xFFFFFF;
+        buffer.fill(0);
+        buffer[100] = 0xFFFFFF;
     }
+
+
 
 }
