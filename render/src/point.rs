@@ -1,12 +1,12 @@
-use nalgebra::Vector3;
+use nalgebra::Vector4;
 pub struct Point{
-    pub position: Vector3<f64>,
+    pub position: Vector4<f64>,
 }
 
 impl Point{
     pub fn new(x:f64, y:f64, z:f64) -> Point{
         Point{
-            position: Vector3::new(x,y,z),
+            position: Vector4::new(x,y,z,1.),
         }
     }
 }

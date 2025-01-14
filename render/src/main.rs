@@ -1,6 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
 
-use crate::line::Line;
 use crate::world::World;
 use crate::view::View;
 use crate::renderer::Renderer;
@@ -22,7 +21,7 @@ fn main() {
 
     let view = View::new(0.,0.,0.,0.,0.,0.,70.);
 
-    let mut world = World::new(1000,1000,1000);
+    let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
 
     let mut renderer = Renderer::new(world,view);
 
@@ -66,8 +65,15 @@ fn main() {
             if window.is_key_down(Key::W){
                 // testing
                 renderer.world.elements[0].points[0].position[2] += 1.;
+                renderer.world.elements[0].points[1].position[2] += 1.;
+                renderer.world.elements[0].points[2].position[2] += 1.;
+
             }else if window.is_key_down(Key::A){
                 renderer.world.elements[0].points[0].position[2] -= 1.;
+                renderer.world.elements[0].points[1].position[2] -= 1.;
+                renderer.world.elements[0].points[2].position[2] -= 1.;
+
+                
     
             }else if window.is_key_down(Key::S){
                 

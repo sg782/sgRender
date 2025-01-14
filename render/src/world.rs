@@ -20,21 +20,30 @@ impl World{
 
 
         // random test data
-        let face = Face::new(0,1,2);
-        let point1 = Point::new(50.,100.,30.);
-        let point2 = Point::new(100.,100.,30.);
-        let point3 = Point::new(65.,250.,30.);
 
+        // generate a cube
+
+        // Define the 8 vertices of the cube
         let mut points: Vec<Point> = Vec::new();
-        points.push(point1);
-        points.push(point2);
-        points.push(point3);
+        points.push(Point::new(-10.0, 0.0, 20.0)); // 0
+        points.push(Point::new(200.0, 0.0, 20.0)); // 1
+        points.push(Point::new(120.0, 50.0, 14.0)); // 2
 
+        points.push(Point::new(175.0, -100.0, 17.0)); // 3
+
+        // Define the 12 triangular faces of the cube
         let mut faces: Vec<Face> = Vec::new();
-        faces.push(face);
+
+        // Bottom face (0, 1, 2, 3)
+        faces.push(Face::new(0, 1, 2));
+
+        faces.push(Face::new(0, 1, 3));
+        faces.push(Face::new(0, 2, 3));
+        faces.push(Face::new(1, 2, 3));
 
 
         let mesh = Mesh::new(points, faces);
+
 
         elements.push(mesh);
 
