@@ -1,4 +1,7 @@
 
+use std::cmp::min;
+use std::cmp::max;
+
 pub struct Line{
     pub x1: f64,
     pub y1: f64,
@@ -7,6 +10,8 @@ pub struct Line{
     pub stroke_width: f64,
     pub color: u32,
 }
+
+
 
 impl Line {
 
@@ -33,19 +38,18 @@ impl Line {
 
         let mut index: usize;
 
-        let dy = self.y2-self.y1;
-        let dx = self.x2-self.x1;
+        let dy = self.y2 - self.y1;
+        let dx = self.x2 - self.x1;
 
 
+    
+
+        // if it is a single point
         if dy as i64 == 0 && dx as i64 == 0 {
             x = self.x1 as i64;
             y = self.y1 as i64;
 
-            
-            if y<0 || y>screen_height{
-                return;
-            }
-            if x<0 || x>screen_width{
+            if y<0 || y>screen_height || x<0 || x>screen_width {
                 return;
             }
 
@@ -56,20 +60,19 @@ impl Line {
 
 
         //determine dominant axis
-        if dy > dx {
+        if dy.abs() > dx.abs() {
             // y is dominant (or equal), step through y
-            for i in 0..dy as i64{
+
+            let y_range = min(0,dy as i64)..max(0,dy as i64);
+            for i in y_range {
                 // worry abt strokewidth later
 
                 y = i + self.y1 as i64;
 
                 x = (i as f64 * (dx/dy) + self.x1) as i64;
 
-                if y<0 || y>screen_height{
-                    continue;
-                }
-                if x<0 || x>screen_width{
-                    continue;
+                if y<0 || y>screen_height || x<0 || x>screen_width {
+                    return;
                 }
 
                 index = ((y*screen_width) + x) as usize;
@@ -78,27 +81,22 @@ impl Line {
 
         }else{
             // x is dominant, step through x
-            for i in 0..dx as i64{
+            let x_range = min(0,dx as i64)..max(0,dx as i64);
+            for i in x_range{
                 // worry abt strokewidth later
 
                 x = i + self.x1 as i64;
 
                 y = (i as f64 * (dy/dx) + self.y1) as i64;
 
-                if y<0 || y>screen_height{
-                    continue;
-                }
-                if x<0 || x>screen_width{
-                    continue;
+                if y<0 || y>screen_height || x<0 || x>screen_width {
+                    return;
                 }
 
                 index = ((y*screen_width) + x) as usize;
                 buffer[index] = self.color;
             }
         }
-
-        
-
 
     }
 

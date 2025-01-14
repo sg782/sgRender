@@ -35,16 +35,27 @@ impl View{
         self.z += val;
     }
 
-    pub fn rotate_x(& mut self, val: f64){
+    pub fn rotate_roll(& mut self, val: f64){
         self.roll += val;
     }
 
-    pub fn rotate_y(& mut self, val: f64){
+    pub fn rotate_pitch(& mut self, val: f64){
         self.pitch += val;
     }
 
-    pub fn rotate_z(& mut self, val: f64){
+    pub fn rotate_yaw(& mut self, val: f64){
         self.yaw += val;
+    }
+
+    pub fn move_forward(&mut self, val: f64){
+        
+    }
+    pub fn move_side(&mut self, val: f64){
+        
+    }
+
+    pub fn print_fov(&mut self){
+        
     }
 
 
