@@ -25,7 +25,7 @@ impl World{
 
         // Define the 8 vertices of the cube
         let mut points: Vec<Point> = Vec::new();
-        points.push(Point::new(-10.0, 0.0, 20.0)); // 0
+        points.push(Point::new(-100.0, 0.0, 20.0)); // 0
         points.push(Point::new(200.0, 0.0, 20.0)); // 1
         points.push(Point::new(120.0, 50.0, 14.0)); // 2
 

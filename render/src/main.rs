@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use minifb::{Key, Window, WindowOptions};
 
 use crate::world::World;
@@ -60,25 +62,38 @@ fn main() {
                 renderer.view.rotate_pitch(-rotation_val);
             }else if window.is_key_down(Key::D){
                 renderer.view.rotate_yaw(rotation_val);
+            }else if window.is_key_down(Key::X){
+                renderer.view.rotate_roll(PI as f64 / -100.);
+            }else if window.is_key_down(Key::Y){
+                renderer.view.rotate_pitch(PI as f64 / -100.);
+            }else if window.is_key_down(Key::Z){
+                renderer.view.rotate_yaw(PI as f64 / -100.);
             }
         }else{
             if window.is_key_down(Key::W){
                 // testing
-                renderer.world.elements[0].points[0].position[2] += 1.;
-                renderer.world.elements[0].points[1].position[2] += 1.;
-                renderer.world.elements[0].points[2].position[2] += 1.;
+                renderer.view.move_z(-1.);
+
+                
 
             }else if window.is_key_down(Key::A){
-                renderer.world.elements[0].points[0].position[2] -= 1.;
-                renderer.world.elements[0].points[1].position[2] -= 1.;
-                renderer.world.elements[0].points[2].position[2] -= 1.;
+                renderer.view.move_x(-5.);
 
-                
+               
     
             }else if window.is_key_down(Key::S){
+                renderer.view.move_z(1.);
+
                 
             }else if window.is_key_down(Key::D){
-    
+                renderer.view.move_x(5.);
+
+            }else if window.is_key_down(Key::X){
+                renderer.view.rotate_roll(PI as f64 / 100.);
+            }else if window.is_key_down(Key::Y){
+                renderer.view.rotate_pitch(PI as f64 / 100.);
+            }else if window.is_key_down(Key::Z){
+                renderer.view.rotate_yaw(PI as f64 / 100.);
             }
         }
 

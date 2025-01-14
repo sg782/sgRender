@@ -46,8 +46,8 @@ impl Renderer {
 
         let left = -width/2.;
         let right = width/2.;
-        let top = -height/2.;
-        let bottom = height/2.;
+        let top = -100.;
+        let bottom = 100.;
 
 
     
@@ -92,6 +92,39 @@ impl Renderer {
                 0., 0., -1., 0., 
             );
              */
+
+            let view_translation = Matrix4::new(
+                1., 0., 0., self.view.x, 
+                0., 1., 0., self.view.y, 
+                0., 0., 1., self.view.z, 
+                0., 0., 0., 1.,
+            );
+
+            let alpha = self.view.roll;
+            let x_rotation = Matrix4::new(
+                1., 0., 0., 0., 
+                0., alpha.cos(), -(alpha.sin()), 0.,
+                0., alpha.sin(), alpha.cos(), 0., 
+                0., 0., 0., 1.,
+            );
+
+            let beta = self.view.pitch;
+            let y_rotation = Matrix4::new(
+                beta.cos(), 0., beta.sin(), 0.,
+                0., 1., 0., 0., 
+                -(beta.sin()), 0., beta.cos(), 0., 
+                0., 0., 0., 1.,
+            );
+
+            let gamma = self.view.yaw;
+            let z_rotation = Matrix4::new(
+                gamma.cos(), -(gamma.sin()), 0., 0.,
+                gamma.sin(), gamma.cos(), 0., 0., 
+                0., 0., 1., 0.,
+                0., 0., 0., 1.,
+            );
+
+
             
             // i notice that there is a perspective3 matrix, idk how it works
             let c1 = (far+near) / depth;
@@ -103,9 +136,6 @@ impl Renderer {
                 0., 0., -1., 0.,
             );
 
-
-
-
             for face in &mesh.faces{
                 for i in 0..3 {
 
@@ -116,14 +146,39 @@ impl Renderer {
                     let point_a = &mesh.points[id_a as usize];
                     let point_b = &mesh.points[id_b as usize];
 
-                    let mut a_position_prime = perspective_transformation * point_a.position;
-                    a_position_prime /= a_position_prime[3];
+                    // translate based on view movement
+                    let pos_a_translated = view_translation * &point_a.position;
+                    let pos_b_translated = view_translation * &point_b.position;
 
-                    let mut b_position_prime = perspective_transformation * point_b.position;
+                    // rotate x
+                    let pos_a_x_rotated = x_rotation * pos_a_translated;
+                    let pos_b_x_rotated = x_rotation * pos_b_translated;
+
+                    // rotate y
+                    let pos_a_y_rotated = y_rotation * pos_a_x_rotated;
+                    let pos_b_y_rotated = y_rotation * pos_b_x_rotated;
+
+                    // rotate z
+                    let pos_a_z_rotated = z_rotation * pos_a_y_rotated;
+                    let pos_b_z_rotated = z_rotation * pos_b_y_rotated;
+
+                    // perspective transformation
+                    let mut a_position_prime = perspective_transformation * pos_a_z_rotated;
+
+                    let mut b_position_prime = perspective_transformation * pos_b_z_rotated;
+
+                    if b_position_prime[3] > -near || a_position_prime[3] > -near {
+                        continue;
+                    }
+
+                    a_position_prime /= a_position_prime[3];
                     b_position_prime /= b_position_prime[3];
 
 
 
+
+
+                    // scale back to device coordinates
                     let mut x1_prime = (a_position_prime[0] +1.)/2.;
                     x1_prime *= width;
 
@@ -137,7 +192,6 @@ impl Renderer {
                     y2_prime *= height;
 
 
-                    
                     let line = Line::new(x1_prime,y1_prime,x2_prime,y2_prime,1.,0xFFFFFF);
 
 
