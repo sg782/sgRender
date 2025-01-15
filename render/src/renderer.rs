@@ -1,14 +1,9 @@
-use crate::point;
 use crate::world::World;
 use crate::view::View;
 
 use crate::line::Line;
 
 use nalgebra::Matrix4;
-use ndarray::arr2;
-
-
-
 
 /*
 RIGHT HANDED COORDINATE SYSTEM:
@@ -40,7 +35,7 @@ impl Renderer {
         let far = 100.;
         let focal_length = 10.;
 
-        let fov = 1.222;  // ~70 degrees
+        let fov = 2.;  // ~70 degrees
 
 
         let depth = far-near;
@@ -164,15 +159,15 @@ impl Renderer {
 
 
            // println!("Faces");
-            for face in &mesh.faces{
+            for face in mesh.faces(){
                 for i in 0..3 {
 
                     
                     let id_a = face.vertices[i];
                     let id_b = face.vertices[(i+1)%3];
 
-                    let point_a = &mesh.points[id_a as usize];
-                    let point_b = &mesh.points[id_b as usize];
+                    let point_a = &mesh.vertices()[id_a as usize];
+                    let point_b = &mesh.vertices()[id_b as usize];
 
                     // translate based on view movement
                     let pos_a_translated = view_translation * &point_a.position;

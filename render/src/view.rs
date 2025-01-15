@@ -53,109 +53,23 @@ impl View{
     pub fn move_forward(&mut self, val: f64){
 
         let movement_vector = Vector4::new(0.,0.,val,0.);
-
-
-        let view_translation = Matrix4::new(
-            1., 0., 0., 0.,
-            0., 1., 0., 0.,
-            0., 0., 1., -1.,
-            0., 0., 0., 1.,
-        );
-
-        let alpha = self.roll;
-        let x_rotation = Matrix4::new(
-            1., 0., 0., 0., 
-            0., alpha.cos(), -(alpha.sin()), 0.,
-            0., alpha.sin(), alpha.cos(), 0., 
-            0., 0., 0., 1.,
-        );
-
-        let beta = self.pitch;
-        let y_rotation = Matrix4::new(
-            beta.cos(), 0., beta.sin(), 0.,
-            0., 1., 0., 0., 
-            -(beta.sin()), 0., beta.cos(), 0., 
-            0., 0., 0., 1.,
-        );
-
-        let gamma = self.yaw;
-        let z_rotation = Matrix4::new(
-            gamma.cos(), -(gamma.sin()), 0., 0.,
-            gamma.sin(), gamma.cos(), 0., 0., 
-            0., 0., 1., 0.,
-            0., 0., 0., 1.,
-        );
-
-        let forward_transformation = view_translation * z_rotation * y_rotation* x_rotation;
-
-        
-        let rotated_movement_vector = forward_transformation * movement_vector;
-
-        // println!("Vector: {}",forward_transformation * movement_vector);
-
-        self.x += rotated_movement_vector[0];
-        self.y += rotated_movement_vector[1];
-        self.z += rotated_movement_vector[2];
-        
-
-        
+        self.relative_move(movement_vector);        
     }
     pub fn move_side(&mut self, val: f64){
 
         let movement_vector = Vector4::new(val,0.,0.,0.);
-
-
-        
-        let view_translation = Matrix4::new(
-            1., 0., 0., -1.,
-            0., 1., 0., 0.,
-            0., 0., 1., 0.,
-            0., 0., 0., 1.,
-        );
-
-        let alpha = self.roll;
-        let x_rotation = Matrix4::new(
-            1., 0., 0., 0., 
-            0., alpha.cos(), -(alpha.sin()), 0.,
-            0., alpha.sin(), alpha.cos(), 0., 
-            0., 0., 0., 1.,
-        );
-
-        let beta = self.pitch;
-        let y_rotation = Matrix4::new(
-            beta.cos(), 0., beta.sin(), 0.,
-            0., 1., 0., 0., 
-            -(beta.sin()), 0., beta.cos(), 0., 
-            0., 0., 0., 1.,
-        );
-
-        let gamma = self.yaw;
-        let z_rotation = Matrix4::new(
-            gamma.cos(), -(gamma.sin()), 0., 0.,
-            gamma.sin(), gamma.cos(), 0., 0., 
-            0., 0., 1., 0.,
-            0., 0., 0., 1.,
-        );
-
-        let forward_transformation = view_translation * z_rotation * y_rotation* x_rotation;
-
-        
-        let rotated_movement_vector = forward_transformation * movement_vector;
-
-        // println!("Vector: {}",forward_transformation * movement_vector);
-
-        self.x += rotated_movement_vector[0];
-        self.y += rotated_movement_vector[1];
-        self.z += rotated_movement_vector[2];
+        self.relative_move(movement_vector);
         
     }
 
     pub fn move_vertical(&mut self, val: f64){
 
         let movement_vector = Vector4::new(0.,val,0.,0.);
+        self.relative_move(movement_vector);
 
+    }
 
-        
+    pub fn relative_move(&mut self, translation: Vector4<f64>){
         let view_translation = Matrix4::new(
             1., 0., 0., -1.,
             0., 1., 0., 0.,
@@ -163,7 +77,7 @@ impl View{
             0., 0., 0., 1.,
         );
 
-        let alpha = self.roll;
+        let alpha = -self.roll;
         let x_rotation = Matrix4::new(
             1., 0., 0., 0., 
             0., alpha.cos(), -(alpha.sin()), 0.,
@@ -171,7 +85,7 @@ impl View{
             0., 0., 0., 1.,
         );
 
-        let beta = self.pitch;
+        let beta = -self.pitch;
         let y_rotation = Matrix4::new(
             beta.cos(), 0., beta.sin(), 0.,
             0., 1., 0., 0., 
@@ -179,7 +93,7 @@ impl View{
             0., 0., 0., 1.,
         );
 
-        let gamma = self.yaw;
+        let gamma = -self.yaw;
         let z_rotation = Matrix4::new(
             gamma.cos(), -(gamma.sin()), 0., 0.,
             gamma.sin(), gamma.cos(), 0., 0., 
@@ -187,10 +101,10 @@ impl View{
             0., 0., 0., 1.,
         );
 
-        let forward_transformation = view_translation * z_rotation * y_rotation* x_rotation;
+        let forward_transformation = view_translation * x_rotation * y_rotation* z_rotation;
 
         
-        let rotated_movement_vector = forward_transformation * movement_vector;
+        let rotated_movement_vector = forward_transformation * translation;
 
         // println!("Vector: {}",forward_transformation * movement_vector);
 

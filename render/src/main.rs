@@ -1,18 +1,16 @@
-use std::f32::consts::PI;
-
 use minifb::{Key, Window, WindowOptions};
 
 use crate::world::World;
 use crate::view::View;
 use crate::renderer::Renderer;
 
+pub mod mesh;
+pub mod models;
+
 mod line;
 mod world;
 mod view;
 mod renderer;
-mod point;
-mod mesh;
-mod face;
 
 const WIDTH: usize = 700;
 const HEIGHT: usize = 700;
@@ -47,12 +45,16 @@ fn main() {
     
 
     // Limit to max ~60 fps update rate
-    window.set_target_fps(20);
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {   
 
 
-        let rotation_val = 0.01;
+
+
+        // random keys for testing
+        // will clean up later
+        let rotation_val = 0.03;
         if window.is_key_down(Key::LeftShift){
             if window.is_key_down(Key::W){
             }else if window.is_key_down(Key::A){
