@@ -36,7 +36,7 @@ impl Renderer {
 
         buffer.fill(0x000000);
 
-        let near = 10.;
+        let near = 1.;
         let far = 100.;
         let focal_length = 10.;
 
@@ -44,8 +44,8 @@ impl Renderer {
         let height = screen_height as f64;
         let depth = far-near;
 
-        let left = -width/2.;
-        let right = width/2.;
+        let left = -100.;
+        let right = 100.;
         let top = -100.;
         let bottom = 100.;
 
@@ -136,6 +136,7 @@ impl Renderer {
                 0., 0., -1., 0.,
             );
 
+           // println!("Faces");
             for face in &mesh.faces{
                 for i in 0..3 {
 
@@ -167,7 +168,7 @@ impl Renderer {
 
                     let mut b_position_prime = perspective_transformation * pos_b_z_rotated;
 
-                    if b_position_prime[3] > -near || a_position_prime[3] > -near {
+                    if b_position_prime[3] > -near && a_position_prime[3] > -near {
                         continue;
                     }
 
@@ -192,7 +193,18 @@ impl Renderer {
                     y2_prime *= height;
 
 
+                    self.clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
+
+
+                    // we need to clip the final coords to fit inside our boundary
+
+
+                    //println!("{} {} {} {}", x1_prime,y1_prime,x2_prime,y2_prime);
+
+
                     let line = Line::new(x1_prime,y1_prime,x2_prime,y2_prime,1.,0xFFFFFF);
+
+
 
 
                     line.draw(buffer, screen_width, screen_height);
@@ -247,7 +259,72 @@ impl Renderer {
         }
     }
 
+    fn clip_at_edge(&self, x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
+        let width = screen_width as f64;
+        let height =screen_height as f64;
+        if *x1 < 0. {
+            let scaling = *x2 / (*x2-*x1);
+            let dy = *y2 - *y1;
 
+            *x1 = 0.;
+            *y1 = *y2 - (scaling * dy);
+        }
+        if *x2 <0. {
+            let scaling = *x1 / (*x1-*x2);
+            let dy = *y1 - *y2;
+
+            *x2 = 0.;
+            *y2 = *y1 - (scaling * dy);
+        }
+
+        if *x1 >= width {
+            let scaling = (width - *x2) / (*x1 - *x2);
+            let dy = *y2 - * y1;
+            *x1 = width-1.;
+            *y1 = *y2 - (scaling * dy);
+        }
+
+        if *x2 >= width {
+            let scaling = (width - *x1) / (*x2 - *x1);
+            let dy = *y1 - * y2;
+            *x2 = width-1.;
+            *y2 = *y1 - (scaling * dy);
+        }
+
+
+        // y
+        if *y1 < 0. {
+            let scaling = *y2 / (*y2-*y1);
+            let dx = *x2 - *x1;
+
+            *y1 = 0.;
+            *x1 = *x2 - (scaling * dx);
+        }
+        if *y2 <0. {
+            let scaling = *y1 / (*y1-*y2);
+            let dx = *x1 - *x2;
+
+            *y2 = 0.;
+            *x2 = *x1 - (scaling * dx);
+        }
+
+        if *y1 >= height {
+            let scaling = (height - *y2) / (*y1 - *y2);
+            let dx = *x2 - * x1;
+            *y1 = height-1.;
+            *x1 = *x2 - (scaling * dx);
+        }
+
+        if *y2 >= height {
+            let scaling = (height - *y1) / (*y2 - *y1);
+            let dx = *x1 - * x2;
+            *y2 = height-1.;
+            *x2 = *x1 - (scaling * dx);
+        }
+
+
+
+    }
 
 }
 

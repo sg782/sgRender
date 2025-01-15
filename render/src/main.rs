@@ -21,7 +21,7 @@ const HEIGHT: usize = 700;
 
 fn main() {
 
-    let view = View::new(0.,0.,0.,0.,0.,0.,70.);
+    let view = View::new(0.,0.,20.,0.,0.,0.,70.);
 
     let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
 
@@ -55,38 +55,35 @@ fn main() {
         let rotation_val = 0.001;
         if window.is_key_down(Key::LeftShift){
             if window.is_key_down(Key::W){
-                renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::A){
-                renderer.view.rotate_yaw(-rotation_val);
             }else if window.is_key_down(Key::S){
-                renderer.view.rotate_pitch(-rotation_val);
             }else if window.is_key_down(Key::D){
-                renderer.view.rotate_yaw(rotation_val);
+
             }else if window.is_key_down(Key::X){
-                renderer.view.rotate_roll(PI as f64 / -100.);
+                renderer.view.rotate_roll(PI as f64 / -500.);
             }else if window.is_key_down(Key::Y){
-                renderer.view.rotate_pitch(PI as f64 / -100.);
+                renderer.view.rotate_pitch(PI as f64 / -500.);
             }else if window.is_key_down(Key::Z){
-                renderer.view.rotate_yaw(PI as f64 / -100.);
+                renderer.view.rotate_yaw(PI as f64 / -500.);
             }
         }else{
             if window.is_key_down(Key::W){
                 // testing
-                renderer.view.move_z(-1.);
-
-                
+                renderer.view.move_forward(-1.);
 
             }else if window.is_key_down(Key::A){
-                renderer.view.move_x(-5.);
+                renderer.view.move_side(-5.);
 
-               
-    
             }else if window.is_key_down(Key::S){
-                renderer.view.move_z(1.);
+                renderer.view.move_forward(1.);
+            
+            }else if window.is_key_down(Key::Q){
+                renderer.view.move_vertical(-5.)
+            }else if window.is_key_down(Key::E){
+                renderer.view.move_vertical(5.)
 
-                
             }else if window.is_key_down(Key::D){
-                renderer.view.move_x(5.);
+                renderer.view.move_side(5.);
 
             }else if window.is_key_down(Key::X){
                 renderer.view.rotate_roll(PI as f64 / 100.);

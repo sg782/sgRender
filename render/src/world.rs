@@ -18,29 +18,66 @@ impl World{
     ) -> World {
         let mut elements: Vec<Mesh> = Vec::new();
 
+        let mut faces: Vec<Face> = Vec::new();
+        let mut points: Vec<Point> = Vec::new();
+
+        // points.push(Point::new(-100.,-100.,-10.));
+        // points.push(Point::new(-100.,300.,-10.));
+        // points.push(Point::new(100.,-100.,-10.));
+
+        // faces.push(Face::new(0,1,2));
+
+
+
 
         // random test data
 
         // generate a cube
 
         // Define the 8 vertices of the cube
-        let mut points: Vec<Point> = Vec::new();
-        points.push(Point::new(-100.0, 0.0, 20.0)); // 0
-        points.push(Point::new(200.0, 0.0, 20.0)); // 1
-        points.push(Point::new(120.0, 50.0, 14.0)); // 2
+        
+        
+        
+        let l = 100.0;
+        points.push(Point::new(-l,-l,-5.)); // 0
+        points.push(Point::new(-l,-l,-3.)); // 1
+        points.push(Point::new(-l,l,-5.)); // 2
+        points.push(Point::new(-l,l,-3.)); // 3
 
-        points.push(Point::new(175.0, -100.0, 17.0)); // 3
+        points.push(Point::new(l,-l,-5.)); // 4
+        points.push(Point::new(l,-l,-3.)); // 5
+        points.push(Point::new(l,l,-5.)); // 6
+        points.push(Point::new(l,l,-3.)); // 7
+
 
         // Define the 12 triangular faces of the cube
-        let mut faces: Vec<Face> = Vec::new();
 
         // Bottom face (0, 1, 2, 3)
-        faces.push(Face::new(0, 1, 2));
 
-        faces.push(Face::new(0, 1, 3));
-        faces.push(Face::new(0, 2, 3));
-        faces.push(Face::new(1, 2, 3));
+        // left
+        faces.push(Face::new(0,1,3));
+        faces.push(Face::new(0,2, 3));
 
+        // top
+        faces.push(Face::new(1, 5, 7));
+        faces.push(Face::new(1, 3, 7));
+
+        // bottom
+        faces.push(Face::new(0, 2, 4));
+        faces.push(Face::new(2, 4, 6));
+
+        //right
+        faces.push(Face::new(4, 5, 6));
+        faces.push(Face::new(5, 6, 7));
+
+        //front
+        faces.push(Face::new(2, 3, 7));
+        faces.push(Face::new(2, 6, 7));
+
+        //back
+        faces.push(Face::new(0, 1, 5));
+        faces.push(Face::new(5, 4, 5));
+        
 
         let mesh = Mesh::new(points, faces);
 
