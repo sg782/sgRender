@@ -36,18 +36,22 @@ impl Renderer {
 
         buffer.fill(0x000000);
 
-        let near = 1.;
+        let near = 5.;
         let far = 100.;
         let focal_length = 10.;
 
-        let width = screen_width as f64;
-        let height = screen_height as f64;
+        let fov = 1.222;  // ~70 degrees
+
+
         let depth = far-near;
 
         let left = -100.;
         let right = 100.;
         let top = -100.;
         let bottom = 100.;
+
+        let width = right - left;
+        let height = top - bottom;
 
 
     
@@ -127,14 +131,37 @@ impl Renderer {
 
             
             // i notice that there is a perspective3 matrix, idk how it works
-            let c1 = (far+near) / depth;
-            let c2 = 2.*far*near / depth; 
-            let perspective_transformation = Matrix4::new(
+            let c1 = -(far+near) / depth;
+            let c2 = -2.*far*near / depth; 
+
+
+            // having troubles with this perspective matrix, maybe I have implemented it slightly wrong,
+            // it stretches the depth quite significantly
+            /*
+                let perspective_transformation = Matrix4::new(
                 2.*near/width, 0., 0., -near*(right+left)/width,
                 0., 2.*near/height, 0., -near*(top+bottom)/height,
                 0., 0., c1, c2,
                 0., 0., -1., 0.,
             );
+             */
+
+
+
+            let a = screen_width as f64 / screen_height as f64;
+
+            let tan_fov = ((fov/2.) as f64).tan();
+
+
+            let perspective_transformation = Matrix4::new(
+                1./(a*tan_fov), 0., 0., 0., 
+                0., 1./tan_fov, 0., 0.,
+                0., 0., c1, c2,
+                0., 0., -1., 0.,
+            );
+
+            
+
 
            // println!("Faces");
             for face in &mesh.faces{
@@ -177,20 +204,18 @@ impl Renderer {
 
 
 
-
-
                     // scale back to device coordinates
                     let mut x1_prime = (a_position_prime[0] +1.)/2.;
-                    x1_prime *= width;
+                    x1_prime *= screen_width as f64;
 
                     let mut y1_prime = (1.-a_position_prime[1])/2.;
-                    y1_prime *= height;
+                    y1_prime *= screen_height as f64;
 
                     let mut x2_prime = (b_position_prime[0] +1.)/2.;
-                    x2_prime *= width;
+                    x2_prime *= screen_width as f64;
 
                     let mut y2_prime = (1.-b_position_prime[1])/2.;
-                    y2_prime *= height;
+                    y2_prime *= screen_height as f64;
 
 
                     self.clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);

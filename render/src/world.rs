@@ -38,16 +38,16 @@ impl World{
         
         
         
-        let l = 100.0;
-        points.push(Point::new(-l,-l,-5.)); // 0
-        points.push(Point::new(-l,-l,-3.)); // 1
-        points.push(Point::new(-l,l,-5.)); // 2
-        points.push(Point::new(-l,l,-3.)); // 3
+        let l = 10.0;
+        points.push(Point::new(-l,-l,-l)); // 0
+        points.push(Point::new(-l,-l,l)); // 1
+        points.push(Point::new(-l,l,-l)); // 2
+        points.push(Point::new(-l,l,l)); // 3
 
-        points.push(Point::new(l,-l,-5.)); // 4
-        points.push(Point::new(l,-l,-3.)); // 5
-        points.push(Point::new(l,l,-5.)); // 6
-        points.push(Point::new(l,l,-3.)); // 7
+        points.push(Point::new(l,-l,-l)); // 4
+        points.push(Point::new(l,-l,l)); // 5
+        points.push(Point::new(l,l,-l)); // 6
+        points.push(Point::new(l,l,l)); // 7
 
 
         // Define the 12 triangular faces of the cube

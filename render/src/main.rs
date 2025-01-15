@@ -21,7 +21,7 @@ const HEIGHT: usize = 700;
 
 fn main() {
 
-    let view = View::new(0.,0.,20.,0.,0.,0.,70.);
+    let view = View::new(0.,0.,30.,0.,0.,0.,70.);
 
     let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
 
@@ -52,7 +52,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {   
 
 
-        let rotation_val = 0.001;
+        let rotation_val = 0.01;
         if window.is_key_down(Key::LeftShift){
             if window.is_key_down(Key::W){
             }else if window.is_key_down(Key::A){
@@ -60,11 +60,11 @@ fn main() {
             }else if window.is_key_down(Key::D){
 
             }else if window.is_key_down(Key::X){
-                renderer.view.rotate_roll(PI as f64 / -500.);
+                renderer.view.rotate_roll(-rotation_val);
             }else if window.is_key_down(Key::Y){
-                renderer.view.rotate_pitch(PI as f64 / -500.);
+                renderer.view.rotate_pitch(-rotation_val);
             }else if window.is_key_down(Key::Z){
-                renderer.view.rotate_yaw(PI as f64 / -500.);
+                renderer.view.rotate_yaw(-rotation_val);
             }
         }else{
             if window.is_key_down(Key::W){
@@ -86,11 +86,11 @@ fn main() {
                 renderer.view.move_side(5.);
 
             }else if window.is_key_down(Key::X){
-                renderer.view.rotate_roll(PI as f64 / 100.);
+                renderer.view.rotate_roll(rotation_val);
             }else if window.is_key_down(Key::Y){
-                renderer.view.rotate_pitch(PI as f64 / 100.);
+                renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::Z){
-                renderer.view.rotate_yaw(PI as f64 / 100.);
+                renderer.view.rotate_yaw(rotation_val);
             }
         }
 
