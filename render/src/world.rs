@@ -21,9 +21,9 @@ impl World{
 
         // test with a row of cubes
         let side_length = 2.;
-        for i in -5..5{
+        for i in -10..10{
             let idx = i as f64;
-            let cube = Cube::new(side_length * idx,-10.,-10.,side_length);
+            let cube = Cube::new(2.*side_length * idx,-10.,-10.,side_length);
             elements.push(Box::new(cube));
 
         }

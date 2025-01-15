@@ -17,6 +17,19 @@ const HEIGHT: usize = 700;
 
 // wud be a cool addition to make it change the fov or something if we move our head closer to the screen
 
+
+
+/*
+Things to add:
+ - turn camera left/right/up/down (relative to view)
+ - render faces
+ - optimize rendering alg (repeats some calculations rn);
+ - i forgot the other stuff
+
+
+
+*/
+
 fn main() {
 
     let view = View::new(0.,0.,30.,0.,0.,0.,70.);
@@ -38,13 +51,10 @@ fn main() {
         panic!("{}", e);
     });
 
-    // let line = Line::new(10.,10.,10.,10.,1.0,0xFFFFFFF);
 
-    // line.draw(&mut buffer,WIDTH as i64,HEIGHT as i64);
 
     
 
-    // Limit to max ~60 fps update rate
     window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {   
