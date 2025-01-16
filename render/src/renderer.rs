@@ -31,7 +31,8 @@ impl Renderer {
 
     pub fn render(&self, buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
 
-        buffer.fill(0x000000);
+        //buffer.fill(0x000000);
+        buffer.fill(0x87CEFA);
 
         let near = 5.;
         let far = 100.;
@@ -160,6 +161,16 @@ impl Renderer {
             
             let full_transformation = perspective_transformation * z_rotation * y_rotation * x_rotation * view_translation;
 
+            let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
+            let mut w_vals: Vec<f64> = Vec::new();
+            for point in mesh.vertices(){
+                let mut transformed_vertex = full_transformation * point.position;
+                w_vals.push(transformed_vertex[3]);
+
+                transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
+                
+            }
+
 
            // println!("Faces");
             for face in mesh.faces(){
@@ -167,24 +178,16 @@ impl Renderer {
 
 
                 for i in 0..3 {
+  
+                    let id_a = face.vertices[i] as usize;
+                    let id_b = face.vertices[(i+1)%3] as usize;
 
-                    
-                    let id_a = face.vertices[i];
-                    let id_b = face.vertices[(i+1)%3];
-
-                    let point_a = &mesh.vertices()[id_a as usize];
-                    let point_b = &mesh.vertices()[id_b as usize];
-
-                    let mut a_position_prime = full_transformation * &point_a.position;
-                    let mut b_position_prime = full_transformation * &point_b.position;
-
-
-                    if b_position_prime[3] > -near && a_position_prime[3] > -near {
+                    if w_vals[id_a] > -near && w_vals[id_b] > -near {
                         continue;
                     }
 
-                    a_position_prime /= a_position_prime[3];
-                    b_position_prime /= b_position_prime[3];
+                    let a_position_prime = transformed_vertices[id_a];
+                    let b_position_prime = transformed_vertices[id_b];
                     
 
 
@@ -212,7 +215,7 @@ impl Renderer {
                     //println!("{} {} {} {}", x1_prime,y1_prime,x2_prime,y2_prime);
 
 
-                    let line = Line::new(x1_prime,y1_prime,x2_prime,y2_prime,1.,0xFFFFFF);
+                    let line = Line::new(x1_prime,y1_prime,x2_prime,y2_prime,1.,0xFF0000);
 
 
 
