@@ -4,6 +4,8 @@ use crate::view::View;
 use crate::line::Line;
 
 use nalgebra::Matrix4;
+use nalgebra::Vector3;
+use nalgebra::Vector4;
 
 /*
 RIGHT HANDED COORDINATE SYSTEM:
@@ -156,10 +158,14 @@ impl Renderer {
             );
 
             
+            let full_transformation = perspective_transformation * z_rotation * y_rotation * x_rotation * view_translation;
 
 
            // println!("Faces");
             for face in mesh.faces(){
+
+
+
                 for i in 0..3 {
 
                     
@@ -169,26 +175,9 @@ impl Renderer {
                     let point_a = &mesh.vertices()[id_a as usize];
                     let point_b = &mesh.vertices()[id_b as usize];
 
-                    // translate based on view movement
-                    let pos_a_translated = view_translation * &point_a.position;
-                    let pos_b_translated = view_translation * &point_b.position;
+                    let mut a_position_prime = full_transformation * &point_a.position;
+                    let mut b_position_prime = full_transformation * &point_b.position;
 
-                    // rotate x
-                    let pos_a_x_rotated = x_rotation * pos_a_translated;
-                    let pos_b_x_rotated = x_rotation * pos_b_translated;
-
-                    // rotate y
-                    let pos_a_y_rotated = y_rotation * pos_a_x_rotated;
-                    let pos_b_y_rotated = y_rotation * pos_b_x_rotated;
-
-                    // rotate z
-                    let pos_a_z_rotated = z_rotation * pos_a_y_rotated;
-                    let pos_b_z_rotated = z_rotation * pos_b_y_rotated;
-
-                    // perspective transformation
-                    let mut a_position_prime = perspective_transformation * pos_a_z_rotated;
-
-                    let mut b_position_prime = perspective_transformation * pos_b_z_rotated;
 
                     if b_position_prime[3] > -near && a_position_prime[3] > -near {
                         continue;
@@ -196,6 +185,7 @@ impl Renderer {
 
                     a_position_prime /= a_position_prime[3];
                     b_position_prime /= b_position_prime[3];
+                    
 
 
 

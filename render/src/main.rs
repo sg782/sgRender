@@ -1,4 +1,6 @@
 use minifb::{Key, Window, WindowOptions};
+use std::time::{Duration, Instant};
+
 
 use crate::world::World;
 use crate::view::View;
@@ -12,8 +14,8 @@ mod world;
 mod view;
 mod renderer;
 
-const WIDTH: usize = 700;
-const HEIGHT: usize = 700;
+const WIDTH: usize = 1200;
+const HEIGHT: usize = 1200;
 
 // wud be a cool addition to make it change the fov or something if we move our head closer to the screen
 
@@ -25,6 +27,8 @@ Things to add:
  - render faces
  - optimize rendering alg (repeats some calculations rn);
  - i forgot the other stuff
+ - occasional out of bounds errors when drawing lines
+    - improve line drawing alg overall to handle more edge cases
 
 
 
@@ -56,6 +60,7 @@ fn main() {
     
 
     window.set_target_fps(60);
+
 
     while window.is_open() && !window.is_key_down(Key::Escape) {   
 
@@ -106,11 +111,17 @@ fn main() {
             }
         }
 
+        
+        let now = Instant::now();
+
+        
         renderer.render(&mut buffer,WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         window
             .update_with_buffer(&buffer, WIDTH, HEIGHT)
             .unwrap();
+
+        println!("{} ms", now.elapsed().as_millis());
     }
 }

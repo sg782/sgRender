@@ -20,10 +20,11 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // test with a row of cubes
-        let side_length = 2.;
-        for i in -10..10{
+        let side_length = 5.;
+        let amount = 500;
+        for i in -amount..amount{
             let idx = i as f64;
-            let cube = Cube::new(2.*side_length * idx,-10.,-10.,side_length);
+            let cube = Cube::new(side_length * idx,-10.,-10.,side_length);
             elements.push(Box::new(cube));
 
         }

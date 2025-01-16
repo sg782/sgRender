@@ -27,8 +27,8 @@ impl Line {
         Line {
             x1, y1, x2, y2, stroke_width, color
         }
-
     }
+
     pub fn draw(&self, buffer: &mut Vec<u32>, screen_width: i64, screen_height: i64){
         // add bounds checks later
 
@@ -49,11 +49,11 @@ impl Line {
             x = self.x1 as i64;
             y = self.y1 as i64;
 
-            if y<0 || y>screen_height || x<0 || x>screen_width {
+            if y<0 || y>=screen_height || x<0 || x>=screen_width {
                 return;
             }
 
-            index = (y*screen_width + x) as usize;
+            index = (y*(screen_width) + x) as usize;
             buffer[index] = self.color;
             return;
         }
@@ -71,7 +71,7 @@ impl Line {
 
                 x = (i as f64 * (dx/dy) + self.x1) as i64;
 
-                if y<0 || y>screen_height || x<0 || x>screen_width {
+                if y<0 || y>=screen_height || x<0 || x>=screen_width {
                     return;
                 }
 
@@ -89,7 +89,7 @@ impl Line {
 
                 y = (i as f64 * (dy/dx) + self.y1) as i64;
 
-                if y<0 || y>screen_height || x<0 || x>screen_width {
+                if y<0 || y>=screen_height || x<0 || x>=screen_width {
                     return;
                 }
 
