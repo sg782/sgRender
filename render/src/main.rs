@@ -36,6 +36,9 @@ Things to add:
  - remove line rendering bugs
  - add render distance
 
+ - be able to parse 3d data formats from files
+    - this would be big
+    - start with .obj files
 
 
 */
