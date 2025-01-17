@@ -1,6 +1,9 @@
 use minifb::{Key, Window, WindowOptions};
+use core::num;
 use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
 
+use rayon::prelude::*;
 
 use crate::world::World;
 use crate::view::View;
@@ -8,35 +11,63 @@ use crate::renderer::Renderer;
 
 pub mod mesh;
 pub mod models;
+use std::thread;
+
 
 mod line;
 mod world;
 mod view;
 mod renderer;
+use num_cpus;
 
 const WIDTH: usize = 1200;
 const HEIGHT: usize = 1200;
 
 // wud be a cool addition to make it change the fov or something if we move our head closer to the screen
 
-
-
 /*
 Things to add:
  - turn camera left/right/up/down (relative to view)
- - render faces
+ - render faces (fill triangles)
  - optimize rendering alg (repeats some calculations rn);
  - i forgot the other stuff
  - occasional out of bounds errors when drawing lines
     - improve line drawing alg overall to handle more edge cases
+ - remove line rendering bugs
+ - add render distance
 
 
 
 */
 
+
+/*
+controls
+
+w - move forward
+s - move backward
+
+a - move left
+d - move right
+
+q - move up
+e - move down
+
+z - rotate positive around z axis
+shift z - rotate negative around z axis
+
+x - rotate positive around x axis
+shift x - rotate negative around x axis
+
+y - rotate positie around y axis
+shift y - rotate negatie around y axis
+
+*/
+
+
 fn main() {
 
-    let view = View::new(0.,0.,30.,0.,0.,0.,70.);
+    let view = View::new(0.,0.,70.,0.,0.,0.,70.);
 
     let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
 
@@ -55,6 +86,10 @@ fn main() {
         panic!("{}", e);
     });
 
+
+
+    let num_entities = num_cpus::get();
+    let entities: Vec<usize> = (0..num_entities).collect();
 
 
     
@@ -115,7 +150,7 @@ fn main() {
         let now = Instant::now();
 
         
-        renderer.render(&mut buffer,WIDTH as i64,HEIGHT as i64);
+        renderer.render(&entities, &mut buffer,WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         window
