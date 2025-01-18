@@ -9,5 +9,13 @@ impl Point{
             position: Vector4::new(x,y,z,1.),
         }
     }
+
+    pub fn new_from_vec(coords: Vec<f64>) -> Point {
+        assert_eq!(coords.len(),3);
+
+        Point {
+            position: Vector4::new(coords[0],coords[1],coords[2],1.)
+        }
+    }
 }
 

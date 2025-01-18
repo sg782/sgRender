@@ -8,6 +8,7 @@ use rayon::prelude::*;
 use crate::world::World;
 use crate::view::View;
 use crate::renderer::Renderer;
+use crate::models::imported::Imported;
 
 pub mod mesh;
 pub mod models;
@@ -69,6 +70,7 @@ shift y - rotate negatie around y axis
 
 
 fn main() {
+
 
     let view = View::new(0.,0.,70.,0.,0.,0.,70.);
 

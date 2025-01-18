@@ -105,8 +105,8 @@ impl Renderer {
     pub fn render(&self, entities: &[usize],  buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
 
 
-        //buffer.fill(0x000000);
-        buffer.fill(0x87CEFA);
+        buffer.fill(0x000000);
+        //buffer.fill(0x87CEFA);
 
 
 

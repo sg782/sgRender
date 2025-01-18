@@ -10,4 +10,14 @@ impl Face {
             vertices: Vector3::new(v1,v2,v3)
         }
     }
+
+    pub fn new_from_vec(vertices: Vec<i64>) -> Face {
+
+        // i need to allow for differente side-amount polygons
+        assert_eq!(vertices.len(),3);
+
+        Face {
+            vertices: Vector3::new(vertices[0],vertices[1],vertices[2])
+        }
+    }
 }
