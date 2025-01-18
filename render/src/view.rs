@@ -1,5 +1,8 @@
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
+use nalgebra::Vector3;
+
+use crate::view;
 
 pub struct View {
     pub x: f64,
@@ -9,6 +12,8 @@ pub struct View {
     pub pitch: f64, // rotation about y axis
     pub yaw: f64,  // rotation about z axis
     pub fov: f64,
+    pub direction: Vector4<f64>,
+    pub rotation: Matrix4<f64>,
 }
 
 impl View{
@@ -21,8 +26,15 @@ impl View{
         yaw: f64,  // rotation about z axis
         fov: f64,
     ) -> View {
+        let direction: Vector4<f64> = Vector4::new(0.,0.,-1.,0.);
+        let rotation: Matrix4<f64> = Matrix4::new(
+            1., 0., 0., 0.,
+            0., 1., 0., 0., 
+            0., 0., 1., 0.,
+            0., 0., 0., 1.,
+        );
         View {
-            x, y, z, roll, pitch, yaw, fov
+            x, y, z, roll, pitch, yaw, fov, direction, rotation
         }
     }
 
@@ -39,43 +51,22 @@ impl View{
     }
 
     pub fn rotate_roll(& mut self, val: f64){
-        self.roll += val;
+        self.rotate(val, 0., 0.,);
     }
 
     pub fn rotate_pitch(& mut self, val: f64){
-        self.pitch += val;
+        self.rotate(0., val, 0.,);
     }
 
     pub fn rotate_yaw(& mut self, val: f64){
-        self.yaw += val;
+        self.rotate(0., 0., val,);
     }
 
-    pub fn move_forward(&mut self, val: f64){
+    pub fn rotate(& mut self, d_roll:f64,d_pitch: f64,d_yaw: f64){
+        self.roll += d_roll;
+        self.pitch += d_pitch;
+        self.yaw += d_yaw;
 
-        let movement_vector = Vector4::new(0.,0.,val,0.);
-        self.relative_move(movement_vector);        
-    }
-    pub fn move_side(&mut self, val: f64){
-
-        let movement_vector = Vector4::new(val,0.,0.,0.);
-        self.relative_move(movement_vector);
-        
-    }
-
-    pub fn move_vertical(&mut self, val: f64){
-
-        let movement_vector = Vector4::new(0.,val,0.,0.);
-        self.relative_move(movement_vector);
-
-    }
-
-    pub fn relative_move(&mut self, translation: Vector4<f64>){
-        let view_translation = Matrix4::new(
-            1., 0., 0., -1.,
-            0., 1., 0., 0.,
-            0., 0., 1., 0.,
-            0., 0., 0., 1.,
-        );
 
         let alpha = -self.roll;
         let x_rotation = Matrix4::new(
@@ -101,12 +92,37 @@ impl View{
             0., 0., 0., 1.,
         );
 
-        let forward_transformation = view_translation * x_rotation * y_rotation* z_rotation;
 
+        let forward_vector = Vector4::new(0.,0.,-1.,0.);
+
+        self.rotation = x_rotation * y_rotation* z_rotation;
+
+        self.direction = self.rotation * forward_vector;
+
+    }
+
+    pub fn move_forward(&mut self, val: f64){
+
+        let movement_vector = Vector4::new(0.,0.,val,0.);
+        self.relative_move(movement_vector);        
+    }
+    pub fn move_side(&mut self, val: f64){
+
+        let movement_vector = Vector4::new(val,0.,0.,0.);
+        self.relative_move(movement_vector);
         
-        let rotated_movement_vector = forward_transformation * translation;
+    }
 
-        // println!("Vector: {}",forward_transformation * movement_vector);
+    pub fn move_vertical(&mut self, val: f64){
+
+        let movement_vector = Vector4::new(0.,val,0.,0.);
+        self.relative_move(movement_vector);
+
+    }
+
+    pub fn relative_move(&mut self, translation: Vector4<f64>){
+
+        let rotated_movement_vector = self.rotation * translation;
 
         self.x += rotated_movement_vector[0];
         self.y += rotated_movement_vector[1];
@@ -117,6 +133,25 @@ impl View{
         
     }
 
+    pub fn in_view(&self, point: Vector4<f64>) -> bool{
+        let view_pos: Vector4<f64> = Vector4::new(self.x,self.y,self.z,1.);
+
+        let vec_to_point = (view_pos - point).normalize();
 
 
+        let forward_dir = self.direction;
+
+
+        // dot prod
+        let cos_a = forward_dir[0] * vec_to_point[0] + forward_dir[1] * vec_to_point[1] + forward_dir[2] * vec_to_point[2];
+
+        
+
+        if cos_a >= (self.fov/2.).cos() {
+            return true;
+        }
+
+        return false;
+
+    }
 }

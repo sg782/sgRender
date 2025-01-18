@@ -34,32 +34,48 @@ impl Renderer {
         }
     }
 
-    fn clip_at_edge(x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
+    pub fn clip_at_edge(x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
         let width = screen_width as f64;
         let height =screen_height as f64;
+
+        if(*x1 <=0. && *x2 <=0.){
+            return;
+        }
+        if(*x1 >=width-1. && *x2>= width-1.){
+            return;
+        }
+
+        if(*y1 <=0. && *y2 <= 0.){
+            return;
+        }
+        if(*y1 >=height-1. && *y2>= height-1.){
+            return;
+        }
+
+
+        // x
         if *x1 < 0. {
             let scaling = *x2 / (*x2-*x1);
+
+
             let dy = *y2 - *y1;
 
             *x1 = 0.;
             *y1 = *y2 - (scaling * dy);
-        }
-        if *x2 <0. {
-            let scaling = *x1 / (*x1-*x2);
-            let dy = *y1 - *y2;
-
-            *x2 = 0.;
-            *y2 = *y1 - (scaling * dy);
-        }
-
-        if *x1 >= width {
+        } else if *x1 >= width {
             let scaling = (width - *x2) / (*x1 - *x2);
             let dy = *y2 - * y1;
             *x1 = width-1.;
             *y1 = *y2 - (scaling * dy);
         }
 
-        if *x2 >= width {
+        if *x2 <0. {
+            let scaling = *x1 / (*x1-*x2);
+            let dy = *y1 - *y2;
+
+            *x2 = 0.;
+            *y2 = *y1 - (scaling * dy);
+        }else if *x2 >= width {
             let scaling = (width - *x1) / (*x2 - *x1);
             let dy = *y1 - * y2;
             *x2 = width-1.;
@@ -74,23 +90,20 @@ impl Renderer {
 
             *y1 = 0.;
             *x1 = *x2 - (scaling * dx);
-        }
-        if *y2 <0. {
-            let scaling = *y1 / (*y1-*y2);
-            let dx = *x1 - *x2;
-
-            *y2 = 0.;
-            *x2 = *x1 - (scaling * dx);
-        }
-
-        if *y1 >= height {
+        }else if *y1 >= height {
             let scaling = (height - *y2) / (*y1 - *y2);
             let dx = *x2 - * x1;
             *y1 = height-1.;
             *x1 = *x2 - (scaling * dx);
         }
 
-        if *y2 >= height {
+        if *y2 <0. {
+            let scaling = *y1 / (*y1-*y2);
+            let dx = *x1 - *x2;
+
+            *y2 = 0.;
+            *x2 = *x1 - (scaling * dx);
+        } else if *y2 >= height {
             let scaling = (height - *y1) / (*y2 - *y1);
             let dx = *x1 - * x2;
             *y2 = height-1.;
@@ -115,7 +128,7 @@ impl Renderer {
         let far = 100.; // operates as a max render distance
 
 
-        let fov = 2.;  // ~70 degrees
+        let fov = self.view.fov;  // ~70 degrees
         let depth = far-near;
 
         let alpha = self.view.roll;
@@ -171,11 +184,6 @@ impl Renderer {
         let num_cores = num_cpus::get();
         let fragment_size = (&self.world.elements.len() / num_cores) + 1;
 
-        //Vec<Vector4<f64>>
-        let mut line_points: Vec<Vector4<f64>> = Vec::new();
-
-        
-
         /*
         multithreading
 
@@ -210,12 +218,21 @@ impl Renderer {
                             let id_a = face.vertices[i] as usize;
                             let id_b = face.vertices[(i+1)%3] as usize;
 
-                            if w_vals[id_a] > -near && w_vals[id_b] > -near {
+                            if w_vals[id_a] > -near || w_vals[id_b] > -near {
                                 continue;
                             }
 
                             let a_position_prime = transformed_vertices[id_a];
                             let b_position_prime = transformed_vertices[id_b];
+
+
+                            /*
+                            check if in fov. if not? IGNORE IT
+
+                            what is a good way to check?
+                            if arctan(triangle ratio) > fov, REMOVE -< slow
+                            
+                             */
                             
                             // scale back to device coordinates
                             let mut x1_prime = (a_position_prime[0] +1.)/2.;
@@ -231,16 +248,27 @@ impl Renderer {
                             y2_prime *= screen_height as f64;
 
 
-                            Renderer::clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
+                            // if x1_prime <=0. && x2_prime <= 0. {
+                            //     continue;
+                            // }else if x1_prime >= screen_width as f64 && x2_prime >= screen_width as f64 {
+                            //     continue;
+                            // }
 
+                            
+
+
+                            Renderer::clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
+                            
                             let single_line_endpoints: Vector4<f64> = Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime);
 
                             thread_data.push(single_line_endpoints);
 
+                            // if(Renderer::clip_line(&mut x1_prime, &mut y1_prime, &mut x2_prime, &mut y2_prime, screen_width, screen_height)){
 
-                            // let line = Line::new(x1_prime,y1_prime,x2_prime,y2_prime,1.,0xFF0000);
+                            //     let single_line_endpoints: Vector4<f64> = Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime);
 
-                            // line.draw(buffer, screen_width, screen_height);
+                            //     thread_data.push(single_line_endpoints);
+                            // }
 
                         }
                     }

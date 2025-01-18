@@ -45,8 +45,14 @@ impl World{
         //     }
         // }
 
-        let teapot = Imported::new("../../3d_models/teapot.obj",100.);
+        
+        let teapot = Imported::new("../../3d_models/teapot.obj",100.,0.,0.,0.);
         elements.push(Box::new(teapot));
+
+        let cube = Cube::new(0.,0.,0.,100.,);
+        //elements.push(Box::new(cube));
+
+
         
         World {
             height, width, depth, elements

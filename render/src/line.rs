@@ -29,6 +29,8 @@ impl Line {
         }
     }
 
+
+
     pub fn draw(&self, buffer: &mut Vec<u32>, screen_width: i64, screen_height: i64){
         // add bounds checks later
 
@@ -100,4 +102,5 @@ impl Line {
 
     }
 
+    
 }

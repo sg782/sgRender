@@ -26,7 +26,7 @@ impl Mesh for Imported {
 }
 
 impl Imported {
-    pub fn new(file_path: &str, scale: f64) -> Imported{
+    pub fn new(file_path: &str, scale: f64,offset_x: f64, offset_y: f64, offset_z: f64) -> Imported{
 
         if !file_path.ends_with(".obj"){
             panic!(".obj filetype required!!");
@@ -50,6 +50,12 @@ impl Imported {
                             panic!("Non numerical data: {}",coord);
                         }
                     }
+
+                    assert_eq!(point_data.len(),3);
+                    point_data[0] += offset_x;
+                    point_data[1] += offset_y;
+                    point_data[2] += offset_z;
+
                     vertices.push(Point::new_from_vec(point_data));
 
                 }   
@@ -95,8 +101,6 @@ impl Imported {
 
                         
                     }
-
-                    println!("{:?}", face_data);
 
                     if(face_data.len()!=3){
                         continue;

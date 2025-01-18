@@ -30,16 +30,11 @@ const HEIGHT: usize = 1200;
 Things to add:
  - turn camera left/right/up/down (relative to view)
  - render faces (fill triangles)
- - optimize rendering alg (repeats some calculations rn);
- - i forgot the other stuff
- - occasional out of bounds errors when drawing lines
-    - improve line drawing alg overall to handle more edge cases
- - remove line rendering bugs
+
  - add render distance
 
- - be able to parse 3d data formats from files
-    - this would be big
-    - start with .obj files
+
+ - dont render meshes behind camera (make a cubic outline at initialization and if cube is out of render then dont render mesh)
 
 
 */
@@ -69,14 +64,41 @@ shift y - rotate negatie around y axis
 */
 
 
+
 fn main() {
 
 
-    let view = View::new(0.,0.,70.,0.,0.,0.,70.);
+    let view = View::new(0.,0.,70.,0.,0.,0.,1.22);
 
     let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
 
     let mut renderer = Renderer::new(world,view);
+
+
+
+
+    for i in -5..10 {
+        for j in 5..=5{
+            let mut x1 = -3.;
+            let mut y1 = i as f64;
+        
+            let mut x2 = 13.;
+            let mut y2 =  j as f64;
+            print!("Before: \n ({},{}) \n ({},{})\n",x1,y1,x2,y2);
+
+            Renderer::clip_at_edge(&mut x1, &mut y1, & mut x2, & mut y2,5,10);
+        
+        
+            println!("\n ({},{}) \n ({},{})\n  ||\n",x1,y1,x2,y2);
+        }
+    }
+
+
+
+
+    //return;
+
+
 
 
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
@@ -144,6 +166,7 @@ fn main() {
 
             }else if window.is_key_down(Key::X){
                 renderer.view.rotate_roll(rotation_val);
+
             }else if window.is_key_down(Key::Y){
                 renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::Z){
