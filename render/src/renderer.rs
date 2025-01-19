@@ -1,14 +1,11 @@
 use crate::world::World;
 use crate::view::View;
-use std::arch::x86_64::_SIDD_CMP_EQUAL_EACH;
 use std::sync::{Arc, RwLock};
-use std::thread;
 use rayon::prelude::*;
 
 use crate::line::{self, Line};
 
 use nalgebra::Matrix4;
-use nalgebra::Vector3;
 use nalgebra::Vector4;
 use num_cpus;
 
@@ -115,7 +112,7 @@ impl Renderer {
     }
 
 
-    pub fn render(&self, entities: &[usize],  buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
+    pub fn render(&self, buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
 
 
         buffer.fill(0x000000);
@@ -123,9 +120,9 @@ impl Renderer {
 
 
 
-        let near = 5.;
+        let near = self.view.near;
 
-        let far = 100.; // operates as a max render distance
+        let far = self.view.far; // operates as a max render distance
 
 
         let fov = self.view.fov;  // ~70 degrees
@@ -138,6 +135,7 @@ impl Renderer {
         let c1 = -(far+near) / depth;
         let c2 = -2.*far*near / depth; 
 
+        // aspect ratio
         let a = screen_width as f64 / screen_height as f64;
 
         let tan_fov = ((fov/2.) as f64).tan();
@@ -201,6 +199,17 @@ impl Renderer {
                 let mut thread_data: Vec<Vector4<f64>> = Vec::new();
 
                 for mesh in chunk.iter() {
+
+                    // check if mesh.bounding_box is in render
+
+                    if !self.view.in_view(mesh){
+                        continue;
+                    }
+                    
+
+
+
+
                     let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
                     let mut w_vals: Vec<f64> = Vec::new();
                     for point in mesh.vertices(){

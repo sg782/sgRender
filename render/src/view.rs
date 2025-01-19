@@ -1,8 +1,7 @@
 use nalgebra::Matrix4;
-use nalgebra::Vector4;
-use nalgebra::Vector3;
-
-use crate::view;
+use nalgebra::{Vector3,Vector4};
+use crate::plane::Plane;
+use crate::mesh::mesh::Mesh;
 
 pub struct View {
     pub x: f64,
@@ -12,8 +11,12 @@ pub struct View {
     pub pitch: f64, // rotation about y axis
     pub yaw: f64,  // rotation about z axis
     pub fov: f64,
+    pub near: f64,
+    pub far: f64,
+    pub aspect_ratio: f64, 
     pub direction: Vector4<f64>,
     pub rotation: Matrix4<f64>,
+    pub frustum_faces: Vec<Plane>,
 }
 
 impl View{
@@ -25,6 +28,8 @@ impl View{
         pitch: f64, // rotation about y axis
         yaw: f64,  // rotation about z axis
         fov: f64,
+        screen_width: usize,
+        screen_height: usize,
     ) -> View {
         let direction: Vector4<f64> = Vector4::new(0.,0.,-1.,0.);
         let rotation: Matrix4<f64> = Matrix4::new(
@@ -33,22 +38,36 @@ impl View{
             0., 0., 1., 0.,
             0., 0., 0., 1.,
         );
-        View {
-            x, y, z, roll, pitch, yaw, fov, direction, rotation
-        }
+
+        // hardcode for now cuz i dont wanna refactor previous instantations haha will do later
+        let near = 1.;
+        let far = 1000.;
+
+        // ratio of width to height
+        let aspect_ratio = screen_width as f64 / screen_height as f64;
+
+        let frustum_faces: Vec<Plane> = Vec::new();
+
+        let mut view = View {
+            x, y, z, roll, pitch, yaw, fov, near, far, aspect_ratio, direction, rotation, frustum_faces
+        };
+
+        view.calculate_frustum_planes();
+
+        view
     }
 
-    pub fn move_x(& mut self, val: f64){
-        self.x += val;
-    }
+    // pub fn move_x(& mut self, val: f64){
+    //     self.x += val;
+    // }
 
-    pub fn move_y(& mut self, val: f64){
-        self.y += val;
-    }
+    // pub fn move_y(& mut self, val: f64){
+    //     self.y += val;
+    // }
 
-    pub fn move_z(& mut self, val: f64){
-        self.z += val;
-    }
+    // pub fn move_z(& mut self, val: f64){
+    //     self.z += val;
+    // }
 
     pub fn rotate_roll(& mut self, val: f64){
         self.rotate(val, 0., 0.,);
@@ -97,7 +116,10 @@ impl View{
 
         self.rotation = x_rotation * y_rotation* z_rotation;
 
-        self.direction = self.rotation * forward_vector;
+        self.direction = (self.rotation * forward_vector);
+
+        self.calculate_frustum_planes();
+
 
     }
 
@@ -124,34 +146,131 @@ impl View{
 
         let rotated_movement_vector = self.rotation * translation;
 
+        
+
         self.x += rotated_movement_vector[0];
         self.y += rotated_movement_vector[1];
         self.z += rotated_movement_vector[2];
+
+        self.calculate_frustum_planes();
     }
 
-    pub fn print_fov(&mut self){
+    // pub fn print_fov(&mut self){
         
-    }
+    // }
 
-    pub fn in_view(&self, point: Vector4<f64>) -> bool{
-        let view_pos: Vector4<f64> = Vector4::new(self.x,self.y,self.z,1.);
+    pub fn in_view(&self, mesh: &Box<dyn Mesh>) -> bool{
 
-        let vec_to_point = (view_pos - point).normalize();
+        let bounding_box = mesh.bounding_box();
 
+        let mut idx = 0;
+        for plane in &self.frustum_faces {
+            //println!("Idx; {}", idx);
+            idx +=1;
+            let mut all_points_outside = true;
 
-        let forward_dir = self.direction;
+            // iterate nicely over
+            
 
+            for i in 0..8{
+                let cur_point: Vector3<f64> = Vector3::new(
+                    if i & 1 == 0 {bounding_box[0][0]} else {bounding_box[1][0]},
+                    if i & 2 == 0 {bounding_box[0][1]} else {bounding_box[1][1]},
+                    if i & 4 == 0 {bounding_box[0][2]} else {bounding_box[1][2]},
+                );
 
-        // dot prod
-        let cos_a = forward_dir[0] * vec_to_point[0] + forward_dir[1] * vec_to_point[1] + forward_dir[2] * vec_to_point[2];
+                if plane.is_inside(cur_point){
+                    // println!("One thign inside {}", i);
+                    all_points_outside = false;
+                    break;
+                }
+            }
 
-        
-
-        if cos_a >= (self.fov/2.).cos() {
-            return true;
+            if(all_points_outside){
+                //println!("Culled by {}", idx);
+                return false;
+            }
         }
 
-        return false;
+        true
 
     }
+
+    pub fn calculate_frustum_planes (&mut self){
+
+        // leaving in the 4th vector point to avoid having to redefine direciton as well
+        let position: Vector3<f64> = Vector3::new(self.x,self.y,self.z);
+
+        let heading: Vector3<f64> = Vector3::new(self.direction[0],self.direction[1],self.direction[2]);
+
+        let near_center = position + (heading * self.near);
+        let far_center = position + (heading * self.far);
+
+
+        
+        //can be optimized, many duplicate calculations. once i get it working, I will do thatt
+
+        // define near vertices
+        // tl = top left, br = bottom right and so on
+
+        let mut near_tl = near_center.clone();
+        near_tl[1] += (self.fov/2.).tan() * self.near;
+        near_tl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.near;
+
+        let mut near_tr = near_center.clone();
+        near_tr[1] += (self.fov/2.).tan() * self.near;
+        near_tr[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.near;
+
+        let mut near_bl = near_center.clone();
+        near_bl[1] -= (self.fov/2.).tan() * self.near;
+        near_bl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.near;
+
+        let mut near_br = near_center.clone();
+        near_br[1] -= (self.fov/2.).tan() * self.near;
+        near_br[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.near;
+        
+
+        // define far vertices
+        let mut far_tl = far_center.clone();
+        far_tl[1] += (self.fov/2.).tan() * self.far;
+        far_tl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.far;
+
+        let mut far_tr = far_center.clone();
+        far_tr[1] += (self.fov/2.).tan() * self.far;
+        far_tr[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.far;
+
+        let mut far_bl = far_center.clone();
+        far_bl[1] -= (self.fov/2.).tan() * self.far;
+        far_bl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.far;
+
+        let mut far_br = far_center.clone();
+        far_br[1] -= (self.fov/2.).tan() * self.far;
+        far_br[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.far;
+
+        self.frustum_faces.clear();
+
+        //near
+        self.frustum_faces.push(Plane::from_points(near_tl, near_tr, near_bl)); // good
+
+        //far
+        self.frustum_faces.push(Plane::from_points(far_tl, far_bl, far_tr)); // good
+
+        // left
+        self.frustum_faces.push(Plane::from_points(near_tl, near_bl, far_tl)); // good
+
+        //right
+        self.frustum_faces.push(Plane::from_points(far_tr,  far_br, near_tr)); // good
+
+        //top
+        self.frustum_faces.push(Plane::from_points(near_tr, near_tl, far_tr)); // good
+
+        //bottom
+        self.frustum_faces.push(Plane::from_points(near_bl, near_br, far_bl)); // good
+
+
+
+        
+
+    }
+
 }

@@ -1,10 +1,12 @@
 use crate::mesh::face::Face;
 use crate::mesh::point::Point;
 use crate::mesh::mesh::Mesh;
+use nalgebra::{Vector2,Vector3};
 
 pub struct Cube {
     vertices: Vec<Point>,
     faces: Vec<Face>,
+    bounding_box: Vector2<Vector3<f64>>
 
 }
 
@@ -15,6 +17,10 @@ impl Mesh for Cube {
 
     fn faces(&self) -> &Vec<Face> {
         &self.faces
+    }
+
+    fn bounding_box(&self) -> &nalgebra::Vector2<nalgebra::Vector3<f64>> {
+        &self.bounding_box
     }
 }
 
@@ -35,6 +41,8 @@ impl Cube{
         vertices.push(Point::new(x+l,y,z+l)); // 5
         vertices.push(Point::new(x+l,y+l,z)); // 6
         vertices.push(Point::new(x+l,y+l,z+l)); // 7
+
+        let bounding_box: Vector2<Vector3<f64>> = Vector2::new(Vector3::new(x,y,z),Vector3::new(x+l,y+l,z+l));
         
 
 
@@ -69,6 +77,7 @@ impl Cube{
         Cube {
             vertices,
             faces,
+            bounding_box,
         }
         
     }
