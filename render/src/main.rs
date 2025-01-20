@@ -92,7 +92,7 @@ fn main() {
 
     
 
-    window.set_target_fps(30);
+    window.set_target_fps(60);
 
 
     while window.is_open() && !window.is_key_down(Key::Escape) {   

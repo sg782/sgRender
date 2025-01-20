@@ -1,9 +1,19 @@
 use nalgebra::Vector3;
 // for defining the frustum bounding planes
 pub struct Plane {
-    normal: Vector3<f64>,
-    distance: f64,
+    pub normal: Vector3<f64>,
+    pub distance: f64,
 }
+
+
+/*
+RIGHT HAND coord system
+
++Z is out of screen (at start)
++X is right
++Y is up
+
+*/
 
 impl Plane {
     //https://www.lighthouse3d.com/tutorials/maths/plane/
@@ -16,11 +26,14 @@ impl Plane {
 
         Plane {
             normal: n,
-            distance
+            distance,
         }
     }
 
     pub fn is_inside(&self, p: Vector3<f64> ) -> bool{
-        self.normal.dot(&p) + self.distance >=0.0
+
+        self.normal.dot(&p) - self.distance <=0.0
     }
+
+
 }

@@ -32,12 +32,12 @@ impl World{
 
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
-        // test with a row of cubes
+        //test with a row of cubes
         let side_length = 5.9;
-        let amount_wide = 50;
-        let amount_high = 50;
-        for i in 0..amount_wide{
-            for j in 0..amount_high{
+        let amount_wide = 45;
+        let amount_high = 45;
+        for i in -amount_wide..amount_wide{
+            for j in -amount_high..amount_high{
                     let idx = i as f64;
                     let jdx = j as f64;
                     let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length);

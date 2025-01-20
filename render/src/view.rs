@@ -40,7 +40,7 @@ impl View{
         );
 
         // hardcode for now cuz i dont wanna refactor previous instantations haha will do later
-        let near = 1.;
+        let near = 0.1;
         let far = 1000.;
 
         // ratio of width to height
@@ -155,6 +155,19 @@ impl View{
         self.calculate_frustum_planes();
     }
 
+
+    pub fn calculate_translated_position_relative(&mut self, translation: Vector4<f64>) -> Vector3<f64> {
+        let rotated_movement_vector = self.rotation * translation;
+
+        let out:Vector3<f64> = Vector3::new(
+            self.x + rotated_movement_vector[0],
+            self.y+rotated_movement_vector[1],
+            self.z+rotated_movement_vector[2],
+        );
+
+        return out;
+    }
+
     // pub fn print_fov(&mut self){
         
     // }
@@ -163,11 +176,15 @@ impl View{
 
         let bounding_box = mesh.bounding_box();
 
+
+        // if any are in every plane, then good
+
+
         let mut idx = 0;
         for plane in &self.frustum_faces {
             //println!("Idx; {}", idx);
-            idx +=1;
             let mut all_points_outside = true;
+
 
             // iterate nicely over
             
@@ -179,9 +196,9 @@ impl View{
                     if i & 4 == 0 {bounding_box[0][2]} else {bounding_box[1][2]},
                 );
 
+
                 if plane.is_inside(cur_point){
-                    // println!("One thign inside {}", i);
-                    all_points_outside = false;
+                   all_points_outside = false;
                     break;
                 }
             }
@@ -190,6 +207,7 @@ impl View{
                 //println!("Culled by {}", idx);
                 return false;
             }
+
         }
 
         true
@@ -207,6 +225,7 @@ impl View{
         let far_center = position + (heading * self.far);
 
 
+
         
         //can be optimized, many duplicate calculations. once i get it working, I will do thatt
 
@@ -214,62 +233,120 @@ impl View{
         // tl = top left, br = bottom right and so on
 
         let mut near_tl = near_center.clone();
-        near_tl[1] += (self.fov/2.).tan() * self.near;
+        near_tl[1] -= (self.fov/2.).tan() * self.near;
         near_tl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.near;
 
-        let mut near_tr = near_center.clone();
-        near_tr[1] += (self.fov/2.).tan() * self.near;
+        let mut near_tr = near_center.clone(); //here
+        near_tr[1] -= (self.fov/2.).tan() * self.near;
         near_tr[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.near;
 
         let mut near_bl = near_center.clone();
-        near_bl[1] -= (self.fov/2.).tan() * self.near;
+        near_bl[1] += (self.fov/2.).tan() * self.near;
         near_bl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.near;
 
-        let mut near_br = near_center.clone();
-        near_br[1] -= (self.fov/2.).tan() * self.near;
+        let mut near_br = near_center.clone(); // here
+        near_br[1] += (self.fov/2.).tan() * self.near;
         near_br[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.near;
+
         
 
         // define far vertices
         let mut far_tl = far_center.clone();
-        far_tl[1] += (self.fov/2.).tan() * self.far;
+        far_tl[1] -= (self.fov/2.).tan() * self.far;
         far_tl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.far;
 
-        let mut far_tr = far_center.clone();
-        far_tr[1] += (self.fov/2.).tan() * self.far;
+        let mut far_tr = far_center.clone(); // here
+        far_tr[1] -= (self.fov/2.).tan() * self.far;
         far_tr[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.far;
 
         let mut far_bl = far_center.clone();
-        far_bl[1] -= (self.fov/2.).tan() * self.far;
+        far_bl[1] += (self.fov/2.).tan() * self.far;
         far_bl[0] -= self.aspect_ratio * (self.fov / 2.).tan() * self.far;
 
         let mut far_br = far_center.clone();
-        far_br[1] -= (self.fov/2.).tan() * self.far;
+        far_br[1] += (self.fov/2.).tan() * self.far;
         far_br[0] += self.aspect_ratio * (self.fov / 2.).tan() * self.far;
+
+
 
         self.frustum_faces.clear();
 
+        let fov = self.fov/2.;
+
+
+        // i forgot that rotations always add some complexity. I did not account for them, new idea
+        let half_near_height = (fov).tan() * self.near;
+        let half_near_width = self.aspect_ratio * half_near_height;
+
+        let half_far_height =  (fov).tan() * self.far;
+        let half_far_width = self.aspect_ratio * half_far_height;
+
+        // now we MOVE the camera to the right position rq, and get a ray from there
+        // we will test with the right plane only, so we need near_tr, near_br, far_tr
+        // this is prolly slow rn, since im using other functions, but it can be optmized later
+
+
+
+        // near_tr
+        let translation: Vector4<f64> = Vector4::new(half_near_width,-half_near_height,-self.near,0.);
+        let near_tr: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // near_br
+        let translation: Vector4<f64> = Vector4::new(half_near_width,half_near_height,-self.near,0.);
+        let near_br: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // near_tl
+        let translation: Vector4<f64> = Vector4::new(-half_near_width,-half_near_height,-self.near,0.);
+        let near_tl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // near_bl
+        let translation: Vector4<f64> = Vector4::new(-half_near_width,half_near_height,-self.near,0.);
+        let near_bl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+
+        // far_tr
+        let translation: Vector4<f64> = Vector4::new(half_far_width,-half_far_height,-self.far,0.);
+        let far_tr: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // far_br
+        let translation: Vector4<f64> = Vector4::new(half_far_width,half_far_height,-self.far,0.);
+        let far_br: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // far_tl
+        let translation: Vector4<f64> = Vector4::new(-half_far_width,-half_far_height,-self.far,0.);
+        let far_tl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+        // far_bl
+        let translation: Vector4<f64> = Vector4::new(-half_far_width,half_far_height,-self.far,0.);
+        let far_bl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+
+
+
+
+        // fix faces for use in the right hand system
+
         //near
-        self.frustum_faces.push(Plane::from_points(near_tl, near_tr, near_bl)); // good
+        self.frustum_faces.push(Plane::from_points(near_bl, far_bl, near_br)); 
 
         //far
-        self.frustum_faces.push(Plane::from_points(far_tl, far_bl, far_tr)); // good
+        self.frustum_faces.push(Plane::from_points(far_tr,  far_br, far_tl)); 
 
         // left
-        self.frustum_faces.push(Plane::from_points(near_tl, near_bl, far_tl)); // good
+        self.frustum_faces.push(Plane::from_points(far_tl,far_bl, near_tl)); // good
 
-        //right
-        self.frustum_faces.push(Plane::from_points(far_tr,  far_br, near_tr)); // good
-
-        //top
-        self.frustum_faces.push(Plane::from_points(near_tr, near_tl, far_tr)); // good
-
-        //bottom
-        self.frustum_faces.push(Plane::from_points(near_bl, near_br, far_bl)); // good
+        // right
+        self.frustum_faces.push(Plane::from_points(near_tr, near_br, far_tr)); // good
 
 
+        //top  (somewhere I must have flipped up and down, i assume the bug is in line.draw, where i forget to flip the 2d y-axis. 
+        // top and bottom work fine, they just are flipped
+        self.frustum_faces.push(Plane::from_points(near_tr, far_tr, near_tl)); //good
 
-        
+        // bottom
+        self.frustum_faces.push(Plane::from_points(near_br, near_bl, far_br)); //good
+
+
+
 
     }
 

@@ -198,6 +198,7 @@ impl Renderer {
 
                 let mut thread_data: Vec<Vector4<f64>> = Vec::new();
 
+
                 for mesh in chunk.iter() {
 
                     // check if mesh.bounding_box is in render
