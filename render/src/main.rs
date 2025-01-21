@@ -8,12 +8,12 @@ use crate::view::View;
 use crate::renderer::Renderer;
 use crate::models::imported::Imported;
 
+use crate::primitives::triangle::Triangle;
+
 pub mod mesh;
 pub mod models;
 mod plane;
-
-
-mod line;
+pub mod primitives;
 mod world;
 mod view;
 mod renderer;
@@ -65,6 +65,8 @@ shift y - rotate negatie around y axis
 fn main() {
 
 
+
+
     let view = View::new(0.,0.,70.,0.,0.,0.,1.22, WIDTH, HEIGHT);
 
     let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
@@ -95,8 +97,13 @@ fn main() {
     window.set_target_fps(60);
 
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {   
+    let mut x0 = 10.;
 
+    // toggle with 'g'
+    let mut use_wireframe: bool = true;
+
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {   
 
 
 
@@ -122,6 +129,7 @@ fn main() {
                 renderer.view.move_forward(-1.);
 
             }else if window.is_key_down(Key::A){
+                x0 += 4.;
                 renderer.view.move_side(-5.);
 
             }else if window.is_key_down(Key::S){
@@ -142,14 +150,24 @@ fn main() {
                 renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::Z){
                 renderer.view.rotate_yaw(rotation_val);
+            }else if window.is_key_down(Key::G){
+                use_wireframe = !use_wireframe;
             }
         }
 
         
         let now = Instant::now();
 
+     
+
         
-        renderer.render(&mut buffer,WIDTH as i64,HEIGHT as i64);
+
+        // let t = Triangle::new(x0,100., 100.,35., 50., 450., 0xFFFFFF);
+
+        // t.draw(&mut buffer, WIDTH as i64,HEIGHT as i64);
+
+        
+        renderer.render(&mut buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         window

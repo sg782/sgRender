@@ -33,29 +33,27 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         //test with a row of cubes
-        let side_length = 5.9;
-        let amount_wide = 45;
-        let amount_high = 45;
-        for i in -amount_wide..amount_wide{
-            for j in -amount_high..amount_high{
-                    let idx = i as f64;
-                    let jdx = j as f64;
-                    let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length);
-                    elements.push(Box::new(cube));
-            }
-        }
+        // let side_length = 5.9;
+        // let amount_wide = 45;
+        // let amount_high = 45;
+        // for i in -amount_wide..amount_wide{
+        //     for j in -amount_high..amount_high{
+        //             let idx = i as f64;
+        //             let jdx = j as f64;
+        //             let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length);
+        //             elements.push(Box::new(cube));
+        //     }
+        // }
 
         
         let teapot = Imported::new("../../3d_models/teapot.obj",100.,0.,0.,0.);
-        // print!("Teapot: {}", teapot.bounding_box());
 
-        // elements.push(Box::new(teapot));
+        elements.push(Box::new(teapot));
 
 
-        let cube = Cube::new(-5.,-20.,1.,100.,);
-        print!("Teapot: {}", cube.bounding_box());
+        // let cube = Cube::new(-5.,-20.,1.,100.,);
 
-        elements.push(Box::new(cube));
+        // elements.push(Box::new(cube));
 
 
         

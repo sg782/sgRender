@@ -1,12 +1,17 @@
 use crate::world::World;
 use crate::view::View;
-use std::sync::{Arc, RwLock};
+use nalgebra::Vector2;
 use rayon::prelude::*;
+use crate::mesh::mesh::Mesh;
 
-use crate::line::{self, Line};
+use crate::primitives::line::Line;
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
+
+use crate::primitives::triangle::Triangle;
+use nalgebra::Vector3;
+
 use num_cpus;
 
 /*
@@ -32,6 +37,7 @@ impl Renderer {
     }
 
     pub fn clip_at_edge(x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
+
         let width = screen_width as f64;
         let height =screen_height as f64;
 
@@ -111,14 +117,7 @@ impl Renderer {
 
     }
 
-
-    pub fn render(&self, buffer: &mut Vec<u32>,  screen_width: i64, screen_height: i64){
-
-
-        buffer.fill(0x000000);
-        //buffer.fill(0x87CEFA);
-
-
+    pub fn calculate_transformation(&self) -> Matrix4<f64>{
 
         let near = self.view.near;
 
@@ -136,7 +135,7 @@ impl Renderer {
         let c2 = -2.*far*near / depth; 
 
         // aspect ratio
-        let a = screen_width as f64 / screen_height as f64;
+        let a = self.view.aspect_ratio;
 
         let tan_fov = ((fov/2.) as f64).tan();
 
@@ -177,7 +176,14 @@ impl Renderer {
 
         let full_transformation = perspective_transformation * z_rotation * y_rotation * x_rotation * view_translation;
 
+        return full_transformation;
+    }
 
+    pub fn render(&self, buffer: &mut Vec<u32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+        //buffer.fill(0x000000);
+        buffer.fill(0x87CEFA);
+
+        let full_transformation = self.calculate_transformation();
 
         let num_cores = num_cpus::get();
         let fragment_size = (&self.world.elements.len() / num_cores) + 1;
@@ -192,113 +198,170 @@ impl Renderer {
 
          */
 
-        let collected_data: Vec<Vec<Vector4<f64>>> = 
+        // draw wirefram instead of faces
+        if use_wireframe {
+            let collected_data: Vec<Vec<Vec<Vector4<f64>>>> = 
+            self.world.elements.par_chunks(fragment_size).map(
+                |chunk| {
+    
+                    let mut thread_data: Vec<Vec<Vector4<f64>>> = Vec::new();
+                    for mesh in chunk.iter() {
+                        thread_data.push(self.calculate_mesh_wireframe(mesh, full_transformation, screen_width, screen_height));
+                    }
+                    thread_data
+                }
+            ).collect();
+    
+            for i in collected_data.iter(){
+                for j in i.iter(){
+                    for k in j.iter() {
+                        let line = Line::new(k[0],k[1],k[2],k[3],1.,0xFF0000);
+                        line.draw(buffer, screen_width, screen_height);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        let collected_data: Vec<Vec<Vec<Vector3<Vector2<f64>>>>> = 
         self.world.elements.par_chunks(fragment_size).map(
             |chunk| {
 
-                let mut thread_data: Vec<Vector4<f64>> = Vec::new();
-
-
+                let mut thread_data:  Vec<Vec<Vector3<Vector2<f64>>>> = Vec::new();
                 for mesh in chunk.iter() {
-
-                    // check if mesh.bounding_box is in render
-
-                    if !self.view.in_view(mesh){
-                        continue;
-                    }
-                    
-
-
-
-
-                    let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
-                    let mut w_vals: Vec<f64> = Vec::new();
-                    for point in mesh.vertices(){
-                        let transformed_vertex = full_transformation * point.position;
-                        w_vals.push(transformed_vertex[3]);
-                        transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
-                        
-                    } 
-
-                    // render each face
-                    for face in mesh.faces(){
-
-                        for i in 0..3 {
-        
-                            let id_a = face.vertices[i] as usize;
-                            let id_b = face.vertices[(i+1)%3] as usize;
-
-                            if w_vals[id_a] > -near || w_vals[id_b] > -near {
-                                continue;
-                            }
-
-                            let a_position_prime = transformed_vertices[id_a];
-                            let b_position_prime = transformed_vertices[id_b];
-
-
-                            /*
-                            check if in fov. if not? IGNORE IT
-
-                            what is a good way to check?
-                            if arctan(triangle ratio) > fov, REMOVE -< slow
-                            
-                             */
-                            
-                            // scale back to device coordinates
-                            let mut x1_prime = (a_position_prime[0] +1.)/2.;
-                            x1_prime *= screen_width as f64;
-
-                            let mut y1_prime = (1.-a_position_prime[1])/2.;
-                            y1_prime *= screen_height as f64;
-
-                            let mut x2_prime = (b_position_prime[0] +1.)/2.;
-                            x2_prime *= screen_width as f64;
-
-                            let mut y2_prime = (1.-b_position_prime[1])/2.;
-                            y2_prime *= screen_height as f64;
-
-
-                            // if x1_prime <=0. && x2_prime <= 0. {
-                            //     continue;
-                            // }else if x1_prime >= screen_width as f64 && x2_prime >= screen_width as f64 {
-                            //     continue;
-                            // }
-
-                            
-
-
-                            Renderer::clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
-                            
-                            let single_line_endpoints: Vector4<f64> = Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime);
-
-                            thread_data.push(single_line_endpoints);
-
-                            // if(Renderer::clip_line(&mut x1_prime, &mut y1_prime, &mut x2_prime, &mut y2_prime, screen_width, screen_height)){
-
-                            //     let single_line_endpoints: Vector4<f64> = Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime);
-
-                            //     thread_data.push(single_line_endpoints);
-                            // }
-
-                        }
-                    }
-
+                    thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
                 }
                 thread_data
             }
         ).collect();
 
-
-
         for i in collected_data.iter(){
             for j in i.iter(){
-                let line = Line::new(j[0],j[1],j[2],j[3],1.,0xFF0000);
-                line.draw(buffer, screen_width, screen_height);
+                for k in j.iter() {
+                    let triangle = Triangle::from_vec_list(k, 0xFFFFFF);
+                    triangle.draw(buffer, screen_width, screen_height);
+                }
             }
         }
-      
+
+
+        // draw faces (default behavior)
+
+
     }
 
 
+    fn calculate_mesh_wireframe(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) -> Vec<Vector4<f64>>{
+        let width = screen_width as f64;
+        let height = screen_height as f64;
+
+
+        let mut mesh_data: Vec<Vector4<f64>> = Vec::new();
+
+
+        // if not in view, dont render
+        if !self.view.in_view(mesh){
+            return mesh_data;
+        }
+        
+        let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
+        let mut w_vals: Vec<f64> = Vec::new();
+        for point in mesh.vertices(){
+            let transformed_vertex = full_transformation * point.position;
+            w_vals.push(transformed_vertex[3]);
+            transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
+            
+        } 
+
+        // render each face
+        for face in mesh.faces(){
+
+            // rendering lines
+            for i in 0..3 {
+
+                let id_a = face.vertices[i] as usize;
+                let id_b = face.vertices[(i+1)%3] as usize;
+
+                if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
+                    continue;
+                }
+
+                let a_position_prime = transformed_vertices[id_a];
+                let b_position_prime = transformed_vertices[id_b];
+
+                // scale back to device coordinates
+                // can remove some parameter passing by scaling AFTER clipping, idc rn
+                let mut x1_prime = width * (a_position_prime[0] +1.)/2.;
+                let mut y1_prime = height * (1.-a_position_prime[1])/2.;
+                let mut x2_prime = width * (b_position_prime[0] +1.)/2.;
+                let mut y2_prime = height * (1.-b_position_prime[1])/2.;
+
+                Renderer::clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
+                mesh_data.push(Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime));
+            }
+
+            // render triangles
+        }
+
+        mesh_data
+    }
+
+    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) ->  Vec<Vector3<Vector2<f64>>>{
+        let width = screen_width as f64;
+        let height = screen_height as f64;
+
+
+        let mut mesh_data: Vec<Vector3<Vector2<f64>>> = Vec::new();
+
+
+        // if not in view, dont render
+        if !self.view.in_view(mesh){
+            return mesh_data;
+        }
+        
+        let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
+        let mut w_vals: Vec<f64> = Vec::new();
+        for point in mesh.vertices(){
+            let transformed_vertex = full_transformation * point.position;
+            w_vals.push(transformed_vertex[3]);
+            transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
+            
+        } 
+
+        // render each face
+        for face in mesh.faces(){
+
+            let mut face_data: Vector3<Vector2<f64>> = Vector3::new(
+                Vector2::new(0.,0.,),
+                Vector2::new(0.,0.,),
+                Vector2::new(0.,0.,),
+            );
+            // rendering lines
+            for i in 0..3 {
+
+                let id_a = face.vertices[i] as usize;
+
+                // if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
+                //     continue;
+                // }
+
+                let a_position_prime = transformed_vertices[id_a];
+
+                // scale back to device coordinates
+                // can remove some parameter passing by scaling AFTER clipping, idc rn
+                let x1_prime = width * (a_position_prime[0] +1.)/2.;
+                let y1_prime = height * (1.-a_position_prime[1])/2.;
+
+                face_data[i] =Vector2::new(x1_prime,y1_prime);
+            }
+
+            mesh_data.push(face_data);
+
+            // render triangles
+        }
+
+        mesh_data
+    }
 }
 

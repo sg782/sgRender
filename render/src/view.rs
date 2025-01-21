@@ -41,7 +41,7 @@ impl View{
 
         // hardcode for now cuz i dont wanna refactor previous instantations haha will do later
         let near = 0.1;
-        let far = 1000.;
+        let far = 500.;
 
         // ratio of width to height
         let aspect_ratio = screen_width as f64 / screen_height as f64;
