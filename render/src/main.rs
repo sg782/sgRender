@@ -1,4 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
+use std::f64::INFINITY;
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
 
@@ -77,7 +78,8 @@ fn main() {
 
 
 
-    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+    let mut pixel_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+    let mut depth_buffer: Vec<f64> = vec![-INFINITY; WIDTH * HEIGHT]; 
 
     let mut window = Window::new(
         "Test - ESC to exit",
@@ -167,11 +169,11 @@ fn main() {
         // t.draw(&mut buffer, WIDTH as i64,HEIGHT as i64);
 
         
-        renderer.render(&mut buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
+        renderer.render(&mut pixel_buffer, &mut depth_buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         window
-            .update_with_buffer(&buffer, WIDTH, HEIGHT)
+            .update_with_buffer(&pixel_buffer, WIDTH, HEIGHT)
             .unwrap();
 
         println!("{} ms", now.elapsed().as_millis());

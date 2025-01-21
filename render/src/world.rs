@@ -51,9 +51,9 @@ impl World{
         elements.push(Box::new(teapot));
 
 
-        // let cube = Cube::new(-5.,-20.,1.,100.,);
+        let cube = Cube::new(-5.,-20.,1.,100.,);
 
-        // elements.push(Box::new(cube));
+        elements.push(Box::new(cube));
 
 
         

@@ -1,13 +1,14 @@
 use nalgebra::Vector3;
 
 pub struct Face{
-    pub vertices: Vector3<i64>,
+    pub vertex_ids: Vector3<i64>,
+
 }
 
 impl Face {
     pub fn new(v1:i64,v2:i64,v3:i64) -> Face{
         Face {
-            vertices: Vector3::new(v1,v2,v3)
+            vertex_ids: Vector3::new(v1,v2,v3)
         }
     }
 
@@ -17,7 +18,12 @@ impl Face {
         assert_eq!(vertices.len(),3);
 
         Face {
-            vertices: Vector3::new(vertices[0],vertices[1],vertices[2])
+            vertex_ids: Vector3::new(vertices[0],vertices[1],vertices[2])
         }
+    }
+
+    pub fn get_centroid(v1: Vector3<f64>, v2: Vector3<f64>, v3: Vector3<f64>){
+        // define a plane
+        // be able to translate along plane
     }
 }

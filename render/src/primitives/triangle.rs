@@ -12,6 +12,7 @@ pub struct Triangle{
     pub v1: Vector2<f64>,
     pub v2: Vector2<f64>,
     pub v3: Vector2<f64>,
+    pub depth: f64,
     pub color: u32,
 }
 
@@ -38,17 +39,17 @@ impl Triangle {
         );
         
         let out = Triangle::sort_vertices(&points);
-        
 
         Triangle {
             v1: out[0],
             v2: out[1],
             v3: out[2],
+            depth: 0.,
             color,
         }
     }
 
-    pub fn from_vec_list(
+    pub fn from_vec3_list(
         v: &Vector3<Vector2<f64>>,
         color: u32,
     ) -> Triangle {
@@ -60,6 +61,26 @@ impl Triangle {
             v1: out[0],
             v2: out[1],
             v3: out[2],
+            depth: 0.,
+            color,
+        }
+    }
+
+    pub fn from_vec4_list(
+        v: &Vector4<Vector2<f64>>,
+        color: u32,
+    ) -> Triangle {
+
+        let vertices = v.xyz(); //gets first 3 entries of v
+
+        let out = Triangle::sort_vertices(&vertices);
+        
+
+        Triangle {
+            v1: out[0],
+            v2: out[1],
+            v3: out[2],
+            depth: v[3][0],
             color,
         }
     }
@@ -67,15 +88,11 @@ impl Triangle {
 
     pub fn sort_vertices(v: &Vector3<Vector2<f64>>) -> Vector3<Vector2<f64>> {
 
-        let mut v1: Vector2<f64>; 
-        let mut v2: Vector2<f64>;
-        let mut v3: Vector2<f64>;
-
         // in order of y
         // v1.y <= v2.y <= v3.y
-        let mut v1: Vector2<f64>; 
-        let mut v2: Vector2<f64>;
-        let mut v3: Vector2<f64>;
+        let v1: Vector2<f64>; 
+        let v2: Vector2<f64>;
+        let v3: Vector2<f64>;
 
         // find top
         let mut v1_idx = 3;
@@ -116,9 +133,8 @@ impl Triangle {
 
 
 
-    pub fn draw(&self, buffer: &mut Vec<u32>, screen_width: i64, screen_height: i64){
+    pub fn draw(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, screen_width: i64, screen_height: i64){
 
-        // ill presort at initialization for performance
 
         /*
         https://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
@@ -130,24 +146,24 @@ impl Triangle {
         // can proceed with alg
 
         if self.v2[1] == self.v3[1] {
-            self.draw_flat_bottom_triangle(buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
+            self.draw_flat_bottom_triangle(pixel_buffer, depth_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
         }else if self.v1[1] == self.v2[1] {
-            self.draw_flat_top_triangle(buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
+            self.draw_flat_top_triangle(pixel_buffer, depth_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
         }else{
 
             // calculating intersection point for both triangles
             let v4_x = self.v1[0] + ((self.v2[1] - self.v1[1]) / (self.v3[1] - self.v1[1])) * (self.v3[0] - self.v1[0]);
             let v4: Vector2<f64> = Vector2::new(v4_x,self.v2[1]);
 
-            self.draw_flat_bottom_triangle(buffer, self.v1, self.v2, v4, screen_width, screen_height); 
-            self.draw_flat_top_triangle(buffer, self.v2, v4, self.v3, screen_width, screen_height);
+            self.draw_flat_bottom_triangle(pixel_buffer, depth_buffer,self.v1, self.v2, v4, screen_width, screen_height); 
+            self.draw_flat_top_triangle(pixel_buffer, depth_buffer,self.v2, v4, self.v3, screen_width, screen_height);
 
         }
 
 
     }
 
-    pub fn draw_flat_bottom_triangle(&self, buffer: &mut Vec<u32>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_bottom_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: & mut Vec<f64>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v2[0] - v1[0]) / (v2[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v1[0]) / (v3[1]- v1[1]);
 
@@ -160,11 +176,21 @@ impl Triangle {
                 // draw line
 
                 if i<0 || i>=screen_height || j<0 || j>=screen_width {
-                    return;
+                    return; 
+                    //
+                    // make a proper triangle clipping alg
                 }
     
+                
                 let index = (i*(screen_width) + j) as usize;
-                buffer[index] = self.color;
+
+                // a more negative depth means further
+                if depth_buffer[index] <= self.depth {
+                    depth_buffer[index] = self.depth;
+                    pixel_buffer[index] = self.color;
+
+                }
+
 
             }
 
@@ -174,7 +200,7 @@ impl Triangle {
         }
     }
 
-    pub fn draw_flat_top_triangle(&self, buffer: &mut Vec<u32>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_top_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v3[0] - v1[0]) / (v3[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v2[0]) / (v3[1]- v2[1]);
 
@@ -193,7 +219,7 @@ impl Triangle {
                 }
     
                 let index = (i*(screen_width) + j) as usize;
-                buffer[index] = self.color;
+                pixel_buffer[index] = self.color;
 
             }
 

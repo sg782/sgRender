@@ -1,3 +1,5 @@
+use std::f64::INFINITY;
+
 use crate::world::World;
 use crate::view::View;
 use nalgebra::Vector2;
@@ -179,9 +181,10 @@ impl Renderer {
         return full_transformation;
     }
 
-    pub fn render(&self, buffer: &mut Vec<u32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
-        //buffer.fill(0x000000);
-        buffer.fill(0x87CEFA);
+    pub fn render(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+        //pixel_buffer.fill(0x000000);
+        pixel_buffer.fill(0x87CEFA);
+        depth_buffer.fill(-INFINITY);
 
         let full_transformation = self.calculate_transformation();
 
@@ -216,7 +219,7 @@ impl Renderer {
                 for j in i.iter(){
                     for k in j.iter() {
                         let line = Line::new(k[0],k[1],k[2],k[3],1.,0xFF0000);
-                        line.draw(buffer, screen_width, screen_height);
+                        line.draw(pixel_buffer, screen_width, screen_height);
                     }
                 }
             }
@@ -224,11 +227,24 @@ impl Renderer {
             return;
         }
 
-        let collected_data: Vec<Vec<Vec<Vector3<Vector2<f64>>>>> = 
+
+
+        // draw faces
+        /*
+        How to efficiently get the depth of the triangle face at all points on the face?
+
+        // for now, we will just use a singular depth value, it should be good enough for simple things
+
+        1. get normal vector
+      
+        
+        
+         */
+        let collected_data: Vec<Vec<Vec<Vector4<Vector2<f64>>>>> = 
         self.world.elements.par_chunks(fragment_size).map(
             |chunk| {
 
-                let mut thread_data:  Vec<Vec<Vector3<Vector2<f64>>>> = Vec::new();
+                let mut thread_data:  Vec<Vec<Vector4<Vector2<f64>>>> = Vec::new();
                 for mesh in chunk.iter() {
                     thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
                 }
@@ -236,13 +252,16 @@ impl Renderer {
             }
         ).collect();
 
+        let mut c: u32 = 0;
+
         for i in collected_data.iter(){
             for j in i.iter(){
                 for k in j.iter() {
-                    let triangle = Triangle::from_vec_list(k, 0xFFFFFF);
-                    triangle.draw(buffer, screen_width, screen_height);
+                    let triangle = Triangle::from_vec4_list(k, 0xDDDDDD * c);
+                    triangle.draw(pixel_buffer, depth_buffer, screen_width, screen_height);
                 }
             }
+            c+=1;
         }
 
 
@@ -280,12 +299,12 @@ impl Renderer {
             // rendering lines
             for i in 0..3 {
 
-                let id_a = face.vertices[i] as usize;
-                let id_b = face.vertices[(i+1)%3] as usize;
+                let id_a = face.vertex_ids[i] as usize;
+                let id_b = face.vertex_ids[(i+1)%3] as usize;
 
                 if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
                     continue;
-                }
+                }                
 
                 let a_position_prime = transformed_vertices[id_a];
                 let b_position_prime = transformed_vertices[id_b];
@@ -307,12 +326,12 @@ impl Renderer {
         mesh_data
     }
 
-    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) ->  Vec<Vector3<Vector2<f64>>>{
+    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) ->  Vec<Vector4<Vector2<f64>>>{
         let width = screen_width as f64;
         let height = screen_height as f64;
 
 
-        let mut mesh_data: Vec<Vector3<Vector2<f64>>> = Vec::new();
+        let mut mesh_data: Vec<Vector4<Vector2<f64>>> = Vec::new();
 
 
         // if not in view, dont render
@@ -332,15 +351,17 @@ impl Renderer {
         // render each face
         for face in mesh.faces(){
 
-            let mut face_data: Vector3<Vector2<f64>> = Vector3::new(
+            // the 4th vector2 represents depth, as a centroid
+            let mut face_data: Vector4<Vector2<f64>> = Vector4::new(
                 Vector2::new(0.,0.,),
                 Vector2::new(0.,0.,),
                 Vector2::new(0.,0.,),
+                Vector2::new(0.,0.),
             );
             // rendering lines
             for i in 0..3 {
 
-                let id_a = face.vertices[i] as usize;
+                let id_a = face.vertex_ids[i] as usize;
 
                 // if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
                 //     continue;
@@ -354,7 +375,10 @@ impl Renderer {
                 let y1_prime = height * (1.-a_position_prime[1])/2.;
 
                 face_data[i] =Vector2::new(x1_prime,y1_prime);
+
+                face_data[3][0] += w_vals[id_a];
             }
+            face_data[3][0] /= 3.;
 
             mesh_data.push(face_data);
 
