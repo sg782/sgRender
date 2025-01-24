@@ -183,13 +183,14 @@ impl Triangle {
     
                 
                 let index = (i*(screen_width) + j) as usize;
+                pixel_buffer[index] = self.color;
 
-                // a more negative depth means further
-                if depth_buffer[index] <= self.depth {
-                    depth_buffer[index] = self.depth;
-                    pixel_buffer[index] = self.color;
 
-                }
+                // // a more negative depth means further
+                // if depth_buffer[index] <= self.depth {
+                //     depth_buffer[index] = self.depth;
+
+                // }
 
 
             }

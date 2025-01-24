@@ -34,6 +34,11 @@ impl Mesh for Imported {
     fn bounding_box(&self) -> &Vector2<Vector3<f64>> {
        &self.bounding_box
     }
+
+    fn color(&self) -> u32 {
+        // default color for now
+        0xFFFFFF
+    }
 }
 
 impl Imported {

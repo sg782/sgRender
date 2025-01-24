@@ -2,17 +2,78 @@ use std::f64::INFINITY;
 
 use crate::world::World;
 use crate::view::View;
+use nalgebra::Transform;
 use nalgebra::Vector2;
 use rayon::prelude::*;
+use vulkano::descriptor_set;
+use vulkano::descriptor_set::layout::DescriptorSetLayoutBinding;
 use crate::mesh::mesh::Mesh;
 
 use crate::primitives::line::Line;
+
+use std::collections::BTreeMap;
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
 
 use crate::primitives::triangle::Triangle;
+
 use nalgebra::Vector3;
+
+
+use std::sync::{Arc, Mutex};
+
+use std::fs;
+
+use vulkano::VulkanLibrary;
+use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
+use vulkano::device::QueueFlags;
+
+use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+
+use vulkano::memory::allocator::StandardMemoryAllocator;
+
+
+use vulkano::descriptor_set::layout::{DescriptorSetLayout,DescriptorSetLayoutCreateInfo,DescriptorType};
+use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
+use vulkano::shader::ShaderStages;
+
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
+
+use vulkano::command_buffer::allocator::{
+    StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
+};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferInfo};
+
+use vulkano::sync::{self, GpuFuture};
+
+
+use vulkano::pipeline::Pipeline;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
+use vulkano::pipeline::PipelineBindPoint;
+
+use vulkano::pipeline::compute::ComputePipelineCreateInfo;
+use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
+use vulkano::pipeline::{ComputePipeline, PipelineShaderStageCreateInfo};
+
+use vulkano::sync::{PipelineStages, AccessFlags};
+
+
+use vulkano::descriptor_set::layout::DescriptorBindingFlags; // Required for `binding_flags`
+
+
+
+
+use vulkano::shader::ShaderModule;
+use std::fs::File;
+use std::io::Read;
+use bytemuck::{Pod, Zeroable};
+
+use crate::shaders::render_information::RenderInformation;
+
+use vulkano::buffer::Subbuffer;
 
 use num_cpus;
 
@@ -24,6 +85,12 @@ RIGHT HANDED COORDINATE SYSTEM:
 +z = FORWARD
 
 */
+
+#[repr(C)]
+#[derive(Default, Copy, Clone, Pod, Zeroable)]
+pub struct Transformation {
+    pub transform_matrix: [[f32; 4]; 4], // Must be an array, not `Matrix4`
+}
 
 pub struct Renderer{
     pub world: World,
@@ -37,6 +104,17 @@ impl Renderer {
             view,
         }
     }
+
+    
+    fn load_shader(device: Arc<vulkano::device::Device>, path: &str) -> Arc<ShaderModule> {
+        let mut file = File::open(path).expect("Failed to open shader file");
+        let mut shader_bytes = Vec::new();
+        file.read_to_end(&mut shader_bytes).unwrap();
+
+        unsafe { ShaderModule::from_bytes(device.clone(), &shader_bytes) }
+            .expect("Failed to create shader module")
+}
+
 
     pub fn clip_at_edge(x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
 
@@ -181,7 +259,20 @@ impl Renderer {
         return full_transformation;
     }
 
-    pub fn render(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+    pub fn render(&self, render_information: &RenderInformation, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+
+
+
+
+        self.compute_vertex_screen_coordinates(render_information);
+
+
+
+
+
+//////////////////////
+
+
         //pixel_buffer.fill(0x000000);
         pixel_buffer.fill(0x87CEFA);
         depth_buffer.fill(-INFINITY);
@@ -202,7 +293,7 @@ impl Renderer {
          */
 
         // draw wirefram instead of faces
-        if use_wireframe {
+        //if use_wireframe {
             let collected_data: Vec<Vec<Vec<Vector4<f64>>>> = 
             self.world.elements.par_chunks(fragment_size).map(
                 |chunk| {
@@ -224,8 +315,8 @@ impl Renderer {
                 }
             }
 
-            return;
-        }
+            //return;
+        //}
 
 
 
@@ -240,6 +331,10 @@ impl Renderer {
         
         
          */
+
+
+        /*
+        // face rendering
         let collected_data: Vec<Vec<Vec<Vector4<Vector2<f64>>>>> = 
         self.world.elements.par_chunks(fragment_size).map(
             |chunk| {
@@ -257,12 +352,15 @@ impl Renderer {
         for i in collected_data.iter(){
             for j in i.iter(){
                 for k in j.iter() {
-                    let triangle = Triangle::from_vec4_list(k, 0xDDDDDD * c);
+                    let triangle = Triangle::from_vec4_list(k, 0xFFFFFF * (c%2));
                     triangle.draw(pixel_buffer, depth_buffer, screen_width, screen_height);
                 }
             }
             c+=1;
         }
+        
+         */
+
 
 
         // draw faces (default behavior)
@@ -387,5 +485,245 @@ impl Renderer {
 
         mesh_data
     }
+
+    fn compute_vertex_screen_coordinates (&self, render_information: &RenderInformation) {
+        // gpu calls
+        
+
+
+        /*
+            Vertex Buffers
+         */
+        let mut raw_vertex_data: Vec<Vector4<f32>> = Vec::new();
+        // put all vertex data into one list, and decompose afterward
+        for mesh in &self.world.elements {
+            for vertice in mesh.vertices(){
+                raw_vertex_data.push(vertice.position.cast::<f32>());
+            }
+        }
+        let buffer_size = (raw_vertex_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
+
+        let vertex_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            raw_vertex_data
+            .iter() // Iterate over `Vec<[f64; 4]>`
+            .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
+
+        ).expect("failed to cretae staging buffer");
+
+        let vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST, // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            raw_vertex_data.len() as u64, // Same size as vertex_buffer
+        ).expect("Failed to create readback buffer!");
+        
+
+
+
+/*
+
+*/
+
+
+        /*
+            Transform Buffer
+         */
+
+        let mat = self.calculate_transformation().cast::<f32>();
+
+        // let transform_staging_buffer = Buffer::new_sized(
+        //     render_information.memory_allocator.clone(),
+        //     BufferCreateInfo {
+        //         usage: BufferUsage::TRANSFER_SRC, // UBO usage
+        //         ..Default::default()
+        //     },
+        //     AllocationCreateInfo {
+        //         memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+        //         ..Default::default()
+        //     },
+        // )
+        // .expect("Failed to create uniform buffer");
+
+        // let mut mapped = transform_staging_buffer.write().unwrap();
+        // *mapped = Transformation {
+        //     transform_matrix: mat.into(), // Convert nalgebra Matrix4 to [[f32; 4]; 4]
+        // };
+
+        let transform_staging_buffer = Buffer::from_data(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            Transformation {
+                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
+            },
+        ).expect("Failed to create uniform buffer");
+
+
+        let transform_buffer: Subbuffer<Transformation> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            std::mem::size_of::<Transformation>() as u64
+        ).expect("Failed to create storage buffer!");
+        
+
+
+ 
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            &render_information.command_buffer_allocator,
+            render_information.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+    
+
+        let work_group_counts = [1024, 1, 1];
+
+    
+    
+        let shader = Renderer::load_shader(render_information.device.clone(), "src/shaders/comp.spv");
+        //let shader = cs::load(device.clone()).expect("failed to create shader module");
+        let cs = shader.entry_point("main").unwrap();
+
+
+        let stage = PipelineShaderStageCreateInfo::new(cs);
+        let layout = PipelineLayout::new(
+            render_information.device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+                .into_pipeline_layout_create_info(render_information.device.clone())
+                .unwrap(),
+        )
+        .unwrap();
+    
+        let compute_pipeline = ComputePipeline::new(
+            render_information.device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(stage, layout),
+        )
+        .expect("failed to create compute pipeline");
+
+    
+        let descriptor_set_allocator =
+            StandardDescriptorSetAllocator::new(render_information.device.clone(), Default::default());
+    
+        let pipeline_layout = compute_pipeline.layout();
+        let descriptor_set_layouts = pipeline_layout.set_layouts();
+    
+
+        let descriptor_set_layout_index = 0;
+        let descriptor_set_layout = descriptor_set_layouts
+            .get(descriptor_set_layout_index)
+            .unwrap();
+
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            descriptor_set_layout.clone(),
+            [
+                WriteDescriptorSet::buffer(0, vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(1, transform_buffer.clone()),
+
+                
+                //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
+                ], 
+            [],
+        )
+        .unwrap();
+
+               
+        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+        // .unwrap()
+
+
+    
+       
+    
+        command_buffer_builder
+            .copy_buffer(CopyBufferInfo::buffers(vertex_staging_buffer.clone(), vertex_buffer.clone()))
+            .unwrap()
+                   
+            // this copy right here caueses the cpu write issue
+            .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+            .unwrap()
+
+
+
+
+            .bind_pipeline_compute(compute_pipeline.clone())
+            .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                compute_pipeline.layout().clone(),
+                descriptor_set_layout_index as u32,
+                descriptor_set,
+            )
+            .unwrap()
+            .dispatch(work_group_counts)
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(vertex_buffer.clone(), vertex_readback_buffer.clone())) // Copy back to CPU
+            .unwrap();
+        
+        let command_buffer = command_buffer_builder.build().unwrap();
+    
+        let future = sync::now(render_information.device.clone())
+        .then_execute(render_information.queue.clone(), command_buffer)
+        .unwrap()
+        .then_signal_fence_and_flush()
+        .unwrap();
+    
+    future.wait(None).unwrap();  // Ensures GPU completion before reading
+    
+        let content = vertex_readback_buffer.read().unwrap();
+        for (n, val) in content.iter().enumerate() {
+            println!("{}, {:?}", n, *val);
+        }
+    
+        println!("Everything succeeded!");
+
+    
+
+
+
+    }
+
 }
 

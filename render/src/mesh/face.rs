@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 
 pub struct Face{
     pub vertex_ids: Vector3<i64>,
-
+    
 }
 
 impl Face {
@@ -22,7 +22,7 @@ impl Face {
         }
     }
 
-    pub fn get_centroid(v1: Vector3<f64>, v2: Vector3<f64>, v3: Vector3<f64>){
+    pub fn get_depth_plane(v1: Vector3<f64>, v2: Vector3<f64>, v3: Vector3<f64>){
         // define a plane
         // be able to translate along plane
     }

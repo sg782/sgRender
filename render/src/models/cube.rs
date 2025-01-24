@@ -6,7 +6,8 @@ use nalgebra::{Vector2,Vector3};
 pub struct Cube {
     vertices: Vec<Point>,
     faces: Vec<Face>,
-    bounding_box: Vector2<Vector3<f64>>
+    bounding_box: Vector2<Vector3<f64>>,
+    color: u32,
 
 }
 
@@ -22,11 +23,15 @@ impl Mesh for Cube {
     fn bounding_box(&self) -> &nalgebra::Vector2<nalgebra::Vector3<f64>> {
         &self.bounding_box
     }
+
+    fn color(&self) -> u32 {
+        self.color
+    }
 }
 
 impl Cube{
     
-    pub fn new(x: f64, y:f64, z:f64, side_length:f64) -> Cube{
+    pub fn new(x: f64, y:f64, z:f64, side_length:f64, color: u32) -> Cube{
         let mut faces: Vec<Face> = Vec::new();
         let mut vertices: Vec<Point> = Vec::new();
         
@@ -78,6 +83,7 @@ impl Cube{
             vertices,
             faces,
             bounding_box,
+            color,
         }
         
     }
