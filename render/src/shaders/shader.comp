@@ -2,6 +2,11 @@
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
+layout(push_constant) uniform PushConstants {
+    float screen_width;
+    float screen_height;
+} push;
+
 layout(set = 0, binding = 0) buffer Data {
     vec4 data[];
 } buf;
@@ -13,5 +18,15 @@ layout(set = 0, binding = 1) uniform Transform {
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     buf.data[idx] = transform.transformMatrix * buf.data[idx];
-    
+
+    if(buf.data[idx][3] != 0){
+        buf.data[idx][0] /= buf.data[idx][3];
+        buf.data[idx][1] /= buf.data[idx][3];
+        buf.data[idx][2] /= buf.data[idx][3];
+
+    }
+
+    buf.data[idx][0] = push.screen_width * (buf.data[idx][0] + 1.) / 2.;
+    buf.data[idx][1] = push.screen_height * (1. - buf.data[idx][1]) / 2.;
+
 }

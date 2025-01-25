@@ -4,35 +4,35 @@ use crate::plane::Plane;
 use crate::mesh::mesh::Mesh;
 
 pub struct View {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-    pub roll: f64, // rotation about x axis
-    pub pitch: f64, // rotation about y axis
-    pub yaw: f64,  // rotation about z axis
-    pub fov: f64,
-    pub near: f64,
-    pub far: f64,
-    pub aspect_ratio: f64, 
-    pub direction: Vector4<f64>,
-    pub rotation: Matrix4<f64>,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub roll: f32, // rotation about x axis
+    pub pitch: f32, // rotation about y axis
+    pub yaw: f32,  // rotation about z axis
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
+    pub aspect_ratio: f32, 
+    pub direction: Vector4<f32>,
+    pub rotation: Matrix4<f32>,
     pub frustum_faces: Vec<Plane>,
 }
 
 impl View{
     pub fn new(
-        x: f64,
-        y: f64,
-        z: f64,
-        roll: f64, // rotation about x axis
-        pitch: f64, // rotation about y axis
-        yaw: f64,  // rotation about z axis
-        fov: f64,
+        x: f32,
+        y: f32,
+        z: f32,
+        roll: f32, // rotation about x axis
+        pitch: f32, // rotation about y axis
+        yaw: f32,  // rotation about z axis
+        fov: f32,
         screen_width: usize,
         screen_height: usize,
     ) -> View {
-        let direction: Vector4<f64> = Vector4::new(0.,0.,-1.,0.);
-        let rotation: Matrix4<f64> = Matrix4::new(
+        let direction: Vector4<f32> = Vector4::new(0.,0.,-1.,0.);
+        let rotation: Matrix4<f32> = Matrix4::new(
             1., 0., 0., 0.,
             0., 1., 0., 0., 
             0., 0., 1., 0.,
@@ -44,7 +44,7 @@ impl View{
         let far = 500.;
 
         // ratio of width to height
-        let aspect_ratio = screen_width as f64 / screen_height as f64;
+        let aspect_ratio = screen_width as f32 / screen_height as f32;
 
         let frustum_faces: Vec<Plane> = Vec::new();
 
@@ -57,31 +57,31 @@ impl View{
         view
     }
 
-    // pub fn move_x(& mut self, val: f64){
+    // pub fn move_x(& mut self, val: f32){
     //     self.x += val;
     // }
 
-    // pub fn move_y(& mut self, val: f64){
+    // pub fn move_y(& mut self, val: f32){
     //     self.y += val;
     // }
 
-    // pub fn move_z(& mut self, val: f64){
+    // pub fn move_z(& mut self, val: f32){
     //     self.z += val;
     // }
 
-    pub fn rotate_roll(& mut self, val: f64){
+    pub fn rotate_roll(& mut self, val: f32){
         self.rotate(val, 0., 0.,);
     }
 
-    pub fn rotate_pitch(& mut self, val: f64){
+    pub fn rotate_pitch(& mut self, val: f32){
         self.rotate(0., val, 0.,);
     }
 
-    pub fn rotate_yaw(& mut self, val: f64){
+    pub fn rotate_yaw(& mut self, val: f32){
         self.rotate(0., 0., val,);
     }
 
-    pub fn rotate(& mut self, d_roll:f64,d_pitch: f64,d_yaw: f64){
+    pub fn rotate(& mut self, d_roll:f32,d_pitch: f32,d_yaw: f32){
         self.roll += d_roll;
         self.pitch += d_pitch;
         self.yaw += d_yaw;
@@ -123,26 +123,26 @@ impl View{
 
     }
 
-    pub fn move_forward(&mut self, val: f64){
+    pub fn move_forward(&mut self, val: f32){
 
         let movement_vector = Vector4::new(0.,0.,val,0.);
         self.relative_move(movement_vector);        
     }
-    pub fn move_side(&mut self, val: f64){
+    pub fn move_side(&mut self, val: f32){
 
         let movement_vector = Vector4::new(val,0.,0.,0.);
         self.relative_move(movement_vector);
         
     }
 
-    pub fn move_vertical(&mut self, val: f64){
+    pub fn move_vertical(&mut self, val: f32){
 
         let movement_vector = Vector4::new(0.,val,0.,0.);
         self.relative_move(movement_vector);
 
     }
 
-    pub fn relative_move(&mut self, translation: Vector4<f64>){
+    pub fn relative_move(&mut self, translation: Vector4<f32>){
 
         let rotated_movement_vector = self.rotation * translation;
 
@@ -156,10 +156,10 @@ impl View{
     }
 
 
-    pub fn calculate_translated_position_relative(&mut self, translation: Vector4<f64>) -> Vector3<f64> {
+    pub fn calculate_translated_position_relative(&mut self, translation: Vector4<f32>) -> Vector3<f32> {
         let rotated_movement_vector = self.rotation * translation;
 
-        let out:Vector3<f64> = Vector3::new(
+        let out:Vector3<f32> = Vector3::new(
             self.x + rotated_movement_vector[0],
             self.y+rotated_movement_vector[1],
             self.z+rotated_movement_vector[2],
@@ -190,7 +190,7 @@ impl View{
             
 
             for i in 0..8{
-                let cur_point: Vector3<f64> = Vector3::new(
+                let cur_point: Vector3<f32> = Vector3::new(
                     if i & 1 == 0 {bounding_box[0][0]} else {bounding_box[1][0]},
                     if i & 2 == 0 {bounding_box[0][1]} else {bounding_box[1][1]},
                     if i & 4 == 0 {bounding_box[0][2]} else {bounding_box[1][2]},
@@ -217,9 +217,9 @@ impl View{
     pub fn calculate_frustum_planes (&mut self){
 
         // leaving in the 4th vector point to avoid having to redefine direciton as well
-        let position: Vector3<f64> = Vector3::new(self.x,self.y,self.z);
+        let position: Vector3<f32> = Vector3::new(self.x,self.y,self.z);
 
-        let heading: Vector3<f64> = Vector3::new(self.direction[0],self.direction[1],self.direction[2]);
+        let heading: Vector3<f32> = Vector3::new(self.direction[0],self.direction[1],self.direction[2]);
 
         let near_center = position + (heading * self.near);
         let far_center = position + (heading * self.far);
@@ -288,37 +288,37 @@ impl View{
 
 
         // near_tr
-        let translation: Vector4<f64> = Vector4::new(half_near_width,-half_near_height,-self.near,0.);
-        let near_tr: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(half_near_width,-half_near_height,-self.near,0.);
+        let near_tr: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // near_br
-        let translation: Vector4<f64> = Vector4::new(half_near_width,half_near_height,-self.near,0.);
-        let near_br: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(half_near_width,half_near_height,-self.near,0.);
+        let near_br: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // near_tl
-        let translation: Vector4<f64> = Vector4::new(-half_near_width,-half_near_height,-self.near,0.);
-        let near_tl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(-half_near_width,-half_near_height,-self.near,0.);
+        let near_tl: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // near_bl
-        let translation: Vector4<f64> = Vector4::new(-half_near_width,half_near_height,-self.near,0.);
-        let near_bl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(-half_near_width,half_near_height,-self.near,0.);
+        let near_bl: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
 
         // far_tr
-        let translation: Vector4<f64> = Vector4::new(half_far_width,-half_far_height,-self.far,0.);
-        let far_tr: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(half_far_width,-half_far_height,-self.far,0.);
+        let far_tr: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // far_br
-        let translation: Vector4<f64> = Vector4::new(half_far_width,half_far_height,-self.far,0.);
-        let far_br: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(half_far_width,half_far_height,-self.far,0.);
+        let far_br: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // far_tl
-        let translation: Vector4<f64> = Vector4::new(-half_far_width,-half_far_height,-self.far,0.);
-        let far_tl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(-half_far_width,-half_far_height,-self.far,0.);
+        let far_tl: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
         // far_bl
-        let translation: Vector4<f64> = Vector4::new(-half_far_width,half_far_height,-self.far,0.);
-        let far_bl: Vector3<f64> = self.calculate_translated_position_relative(translation);
+        let translation: Vector4<f32> = Vector4::new(-half_far_width,half_far_height,-self.far,0.);
+        let far_bl: Vector3<f32> = self.calculate_translated_position_relative(translation);
 
 
 

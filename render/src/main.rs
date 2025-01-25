@@ -1,5 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
-use std::f64::INFINITY;
+use std::f32::INFINITY;
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
 
@@ -170,7 +170,7 @@ fn main() {
 
 
     let mut pixel_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-    let mut depth_buffer: Vec<f64> = vec![-INFINITY; WIDTH * HEIGHT]; 
+    let mut depth_buffer: Vec<f32> = vec![-INFINITY; WIDTH * HEIGHT]; 
 
     let mut window = Window::new(
         "Test - ESC to exit",
@@ -187,7 +187,7 @@ fn main() {
 
     
 
-    window.set_target_fps(10);
+    window.set_target_fps(100);
 
 
     let mut x0 = 10.;

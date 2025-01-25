@@ -8,7 +8,8 @@ use nalgebra::Vector3;
 pub trait Mesh: Send + Sync{
     fn vertices(&self) -> &Vec<Point>;
     fn faces(&self) -> &Vec<Face>;
-    fn bounding_box(&self) -> &Vector2<Vector3<f64>>;
+    fn bounding_box(&self) -> &Vector2<Vector3<f32>>;
     fn color(&self) -> u32;
+    fn num_vertices(&self) -> usize;
     // fn get cubic outline, only render if cubic outline is inside
 }

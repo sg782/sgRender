@@ -2,7 +2,7 @@ use crate::mesh::face::Face;
 use crate::mesh::point::{self, Point};
 use crate::mesh::mesh::Mesh;
 
-use std::f64::INFINITY;
+use std::f32::INFINITY;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -19,7 +19,8 @@ use std::cmp::max;
 pub struct Imported {
     vertices: Vec<Point>,
     faces: Vec<Face>,
-    bounding_box: Vector2<Vector3<f64>>,
+    bounding_box: Vector2<Vector3<f32>>,
+    num_vertices: usize, 
 }
 
 impl Mesh for Imported {
@@ -31,7 +32,7 @@ impl Mesh for Imported {
         &self.faces
     }
 
-    fn bounding_box(&self) -> &Vector2<Vector3<f64>> {
+    fn bounding_box(&self) -> &Vector2<Vector3<f32>> {
        &self.bounding_box
     }
 
@@ -39,26 +40,32 @@ impl Mesh for Imported {
         // default color for now
         0xFFFFFF
     }
+    fn num_vertices(&self) -> usize {
+        self.num_vertices
+    }
 }
 
 impl Imported {
-    pub fn new(file_path: &str, scale: f64,offset_x: f64, offset_y: f64, offset_z: f64) -> Imported{
+    pub fn new(file_path: &str, scale: f32,offset_x: f32, offset_y: f32, offset_z: f32) -> Imported{
 
         let mut faces: Vec<Face> = Vec::new();
         let mut vertices: Vec<Point> = Vec::new();
 
         // corners for bounding cube, will iteratively find the actual points
-        let min_bounding_vertex: Vector3<f64> = Vector3::new(INFINITY,INFINITY,INFINITY);
-        let max_bounding_vertex: Vector3<f64> = Vector3::new(-INFINITY,-INFINITY,-INFINITY);
-        let mut bounding_box: Vector2<Vector3<f64>> = Vector2::new(min_bounding_vertex,max_bounding_vertex);
+        let min_bounding_vertex: Vector3<f32> = Vector3::new(INFINITY,INFINITY,INFINITY);
+        let max_bounding_vertex: Vector3<f32> = Vector3::new(-INFINITY,-INFINITY,-INFINITY);
+        let mut bounding_box: Vector2<Vector3<f32>> = Vector2::new(min_bounding_vertex,max_bounding_vertex);
 
 
         Imported::fill_model_data(file_path, scale, offset_x, offset_y, offset_z, &mut faces, &mut vertices,& mut bounding_box);
+
+        let num_vertices = vertices.len();
 
         Imported {
             vertices,
             faces,
             bounding_box,
+            num_vertices,
         }
     }
 
@@ -69,7 +76,7 @@ impl Imported {
         Ok(io::BufReader::new(file).lines())
     }
 
-    fn fill_model_data(file_path: &str, scale: f64,offset_x: f64, offset_y: f64, offset_z: f64, faces: & mut Vec<Face>, vertices: &mut Vec<Point>,bounding_box: & mut Vector2<Vector3<f64>>){
+    fn fill_model_data(file_path: &str, scale: f32,offset_x: f32, offset_y: f32, offset_z: f32, faces: & mut Vec<Face>, vertices: &mut Vec<Point>,bounding_box: & mut Vector2<Vector3<f32>>){
         if !file_path.ends_with(".obj"){
             panic!(".obj filetype required!!");
         }
@@ -80,11 +87,11 @@ impl Imported {
                 if line.starts_with("v "){
                     // if a vertex
                     
-                    let mut point_data: Vec<f64> = Vec::new();
+                    let mut point_data: Vec<f32> = Vec::new();
                     let itr = line[2..line.len()].split(" ");
                     
                     for coord in itr {
-                        if let Ok(num) = coord.parse::<f64>() {
+                        if let Ok(num) = coord.parse::<f32>() {
                             point_data.push(scale*num);
                         }else{
                             panic!("Non numerical data: {}",coord);

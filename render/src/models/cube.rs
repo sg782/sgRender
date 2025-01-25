@@ -6,8 +6,9 @@ use nalgebra::{Vector2,Vector3};
 pub struct Cube {
     vertices: Vec<Point>,
     faces: Vec<Face>,
-    bounding_box: Vector2<Vector3<f64>>,
+    bounding_box: Vector2<Vector3<f32>>,
     color: u32,
+    num_vertices: usize,
 
 }
 
@@ -20,18 +21,22 @@ impl Mesh for Cube {
         &self.faces
     }
 
-    fn bounding_box(&self) -> &nalgebra::Vector2<nalgebra::Vector3<f64>> {
+    fn bounding_box(&self) -> &nalgebra::Vector2<nalgebra::Vector3<f32>> {
         &self.bounding_box
     }
 
     fn color(&self) -> u32 {
         self.color
     }
+
+    fn num_vertices(&self) -> usize {
+        self.num_vertices
+    }
 }
 
 impl Cube{
     
-    pub fn new(x: f64, y:f64, z:f64, side_length:f64, color: u32) -> Cube{
+    pub fn new(x: f32, y:f32, z:f32, side_length:f32, color: u32) -> Cube{
         let mut faces: Vec<Face> = Vec::new();
         let mut vertices: Vec<Point> = Vec::new();
         
@@ -47,8 +52,9 @@ impl Cube{
         vertices.push(Point::new(x+l,y+l,z)); // 6
         vertices.push(Point::new(x+l,y+l,z+l)); // 7
 
-        let bounding_box: Vector2<Vector3<f64>> = Vector2::new(Vector3::new(x,y,z),Vector3::new(x+l,y+l,z+l));
+        let bounding_box: Vector2<Vector3<f32>> = Vector2::new(Vector3::new(x,y,z),Vector3::new(x+l,y+l,z+l));
         
+        let num_vertices = vertices.len();
 
 
         // Define the 12 triangular faces of the cube
@@ -84,6 +90,7 @@ impl Cube{
             faces,
             bounding_box,
             color,
+            num_vertices,
         }
         
     }

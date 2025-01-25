@@ -32,20 +32,20 @@ impl World{
 
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
-        // //test with a row of cubes
-        // let side_length = 5.9;
-        // let amount_wide = 15;
-        // let amount_high = 15;
-        // let mut count: u32 = 0;
-        // for i in -amount_wide..amount_wide{
-        //     for j in -amount_high..amount_high{
-        //         count +=1;
-        //             let idx = i as f64;
-        //             let jdx = j as f64;
-        //             let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length, 0xFFFFFF * (count %2));
-        //             elements.push(Box::new(cube));
-        //     }
-        // }
+        //test with a row of cubes
+        let side_length = 5.9;
+        let amount_wide = 25;
+        let amount_high = 25;
+        let mut count: u32 = 0;
+        for i in -amount_wide..amount_wide{
+            for j in -amount_high..amount_high{
+                count +=1;
+                    let idx = i as f32;
+                    let jdx = j as f32;
+                    let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length, 0xFFFFFF * (count %2));
+                    elements.push(Box::new(cube));
+            }
+        }
 
         
         // let teapot = Imported::new("../../3d_models/teapot.obj",100.,0.,0.,0.);

@@ -1,7 +1,7 @@
 
 use std::cmp::min;
 use std::cmp::max;
-use std::f64::INFINITY;
+use std::f32::INFINITY;
 use std::prelude::v1;
 
 use nalgebra::Vector4;
@@ -9,10 +9,10 @@ use nalgebra::Vector3;
 use nalgebra::Vector2;
 
 pub struct Triangle{
-    pub v1: Vector2<f64>,
-    pub v2: Vector2<f64>,
-    pub v3: Vector2<f64>,
-    pub depth: f64,
+    pub v1: Vector2<f32>,
+    pub v2: Vector2<f32>,
+    pub v3: Vector2<f32>,
+    pub depth: f32,
     pub color: u32,
 }
 
@@ -23,16 +23,16 @@ impl Triangle {
     // always fill (for now)
 
     pub fn new(
-        x0: f64,
-        y0: f64,
-        x1: f64,
-        y1: f64,
-        x2: f64,
-        y2: f64,
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
         color: u32,
     ) -> Triangle {
 
-        let points: Vector3<Vector2<f64>> = Vector3::new(
+        let points: Vector3<Vector2<f32>> = Vector3::new(
             Vector2::new(x0,y0),
             Vector2::new(x1,y1),
             Vector2::new(x2,y2),
@@ -50,7 +50,7 @@ impl Triangle {
     }
 
     pub fn from_vec3_list(
-        v: &Vector3<Vector2<f64>>,
+        v: &Vector3<Vector2<f32>>,
         color: u32,
     ) -> Triangle {
 
@@ -67,7 +67,7 @@ impl Triangle {
     }
 
     pub fn from_vec4_list(
-        v: &Vector4<Vector2<f64>>,
+        v: &Vector4<Vector2<f32>>,
         color: u32,
     ) -> Triangle {
 
@@ -86,13 +86,13 @@ impl Triangle {
     }
 
 
-    pub fn sort_vertices(v: &Vector3<Vector2<f64>>) -> Vector3<Vector2<f64>> {
+    pub fn sort_vertices(v: &Vector3<Vector2<f32>>) -> Vector3<Vector2<f32>> {
 
         // in order of y
         // v1.y <= v2.y <= v3.y
-        let v1: Vector2<f64>; 
-        let v2: Vector2<f64>;
-        let v3: Vector2<f64>;
+        let v1: Vector2<f32>; 
+        let v2: Vector2<f32>;
+        let v3: Vector2<f32>;
 
         // find top
         let mut v1_idx = 3;
@@ -123,7 +123,7 @@ impl Triangle {
         v3 = v[v3_idx];
 
 
-        let out: Vector3<Vector2<f64>> = Vector3::new(
+        let out: Vector3<Vector2<f32>> = Vector3::new(
             v1, v2, v3,
         );
 
@@ -133,7 +133,7 @@ impl Triangle {
 
 
 
-    pub fn draw(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, screen_width: i64, screen_height: i64){
+    pub fn draw(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, screen_width: i64, screen_height: i64){
 
 
         /*
@@ -153,7 +153,7 @@ impl Triangle {
 
             // calculating intersection point for both triangles
             let v4_x = self.v1[0] + ((self.v2[1] - self.v1[1]) / (self.v3[1] - self.v1[1])) * (self.v3[0] - self.v1[0]);
-            let v4: Vector2<f64> = Vector2::new(v4_x,self.v2[1]);
+            let v4: Vector2<f32> = Vector2::new(v4_x,self.v2[1]);
 
             self.draw_flat_bottom_triangle(pixel_buffer, depth_buffer,self.v1, self.v2, v4, screen_width, screen_height); 
             self.draw_flat_top_triangle(pixel_buffer, depth_buffer,self.v2, v4, self.v3, screen_width, screen_height);
@@ -163,7 +163,7 @@ impl Triangle {
 
     }
 
-    pub fn draw_flat_bottom_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: & mut Vec<f64>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_bottom_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: & mut Vec<f32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v2[0] - v1[0]) / (v2[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v1[0]) / (v3[1]- v1[1]);
 
@@ -201,7 +201,7 @@ impl Triangle {
         }
     }
 
-    pub fn draw_flat_top_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, v1: Vector2<f64>, v2: Vector2<f64>, v3: Vector2<f64>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_top_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v3[0] - v1[0]) / (v3[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v2[0]) / (v3[1]- v2[1]);
 

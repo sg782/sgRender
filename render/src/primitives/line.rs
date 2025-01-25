@@ -2,12 +2,14 @@
 use std::cmp::min;
 use std::cmp::max;
 
+use nalgebra::Vector2;
+
 pub struct Line{
-    pub x1: f64,
-    pub y1: f64,
-    pub x2: f64,
-    pub y2: f64,
-    pub stroke_width: f64,
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+    pub stroke_width: f32,
     pub color: u32,
 }
 
@@ -16,16 +18,28 @@ pub struct Line{
 impl Line {
 
     pub fn new(
-        x1: f64,
-        y1: f64,
-        x2: f64,
-        y2: f64,
-        stroke_width: f64,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        stroke_width: f32,
         color: u32,
     ) -> Line {
         
         Line {
             x1, y1, x2, y2, stroke_width, color
+        }
+    }
+
+    pub fn from_vec (p0: Vector2<f32>, p1: Vector2<f32>, color: u32) -> Line{
+
+        Line {
+            x1: p0[0],
+            y1: p0[1],
+            x2: p1[0],
+            y2: p1[1],
+            stroke_width: 1.,
+            color,
         }
     }
 
@@ -71,7 +85,7 @@ impl Line {
 
                 y = i + self.y1 as i64;
 
-                x = (i as f64 * (dx/dy) + self.x1) as i64;
+                x = (i as f32 * (dx/dy) + self.x1) as i64;
 
                 if y<0 || y>=screen_height || x<0 || x>=screen_width {
                     return;
@@ -89,7 +103,7 @@ impl Line {
 
                 x = i + self.x1 as i64;
 
-                y = (i as f64 * (dy/dx) + self.y1) as i64;
+                y = (i as f32 * (dy/dx) + self.y1) as i64;
 
                 if y<0 || y>=screen_height || x<0 || x>=screen_width {
                     return;

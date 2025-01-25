@@ -22,7 +22,7 @@ impl Face {
         }
     }
 
-    pub fn get_depth_plane(v1: Vector3<f64>, v2: Vector3<f64>, v3: Vector3<f64>){
+    pub fn get_depth_plane(v1: Vector3<f32>, v2: Vector3<f32>, v3: Vector3<f32>){
         // define a plane
         // be able to translate along plane
     }

@@ -1,4 +1,4 @@
-use std::f64::INFINITY;
+use std::f32::INFINITY;
 
 use crate::world::World;
 use crate::view::View;
@@ -37,6 +37,8 @@ use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::descriptor_set::layout::{DescriptorSetLayout,DescriptorSetLayoutCreateInfo,DescriptorType};
 use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
 use vulkano::shader::ShaderStages;
+
+use vulkano::pipeline::layout::{PushConstantRange};
 
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
@@ -92,6 +94,13 @@ pub struct Transformation {
     pub transform_matrix: [[f32; 4]; 4], // Must be an array, not `Matrix4`
 }
 
+#[repr(C)] // Ensures memory layout compatibility with Vulkan
+#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
+struct PushConstants {
+    a: f32,
+    b: f32,
+}
+
 pub struct Renderer{
     pub world: World,
     pub view: View,
@@ -116,10 +125,10 @@ impl Renderer {
 }
 
 
-    pub fn clip_at_edge(x1: &mut f64, y1: &mut f64, x2: &mut f64, y2: &mut f64, screen_width: i64, screen_height: i64){
+    pub fn clip_at_edge(x1: &mut f32, y1: &mut f32, x2: &mut f32, y2: &mut f32, screen_width: i64, screen_height: i64){
 
-        let width = screen_width as f64;
-        let height =screen_height as f64;
+        let width = screen_width as f32;
+        let height =screen_height as f32;
 
         if(*x1 <=0. && *x2 <=0.){
             return;
@@ -197,7 +206,7 @@ impl Renderer {
 
     }
 
-    pub fn calculate_transformation(&self) -> Matrix4<f64>{
+    pub fn calculate_transformation(&self) -> Matrix4<f32>{
 
         let near = self.view.near;
 
@@ -209,7 +218,7 @@ impl Renderer {
 
         let alpha = self.view.roll;
         let beta = self.view.pitch;
-        let gamma: f64 = self.view.yaw;
+        let gamma: f32 = self.view.yaw;
 
         let c1 = -(far+near) / depth;
         let c2 = -2.*far*near / depth; 
@@ -217,7 +226,7 @@ impl Renderer {
         // aspect ratio
         let a = self.view.aspect_ratio;
 
-        let tan_fov = ((fov/2.) as f64).tan();
+        let tan_fov = ((fov/2.) as f32).tan();
 
         let view_translation = Matrix4::new(
             1., 0., 0., self.view.x, 
@@ -259,13 +268,67 @@ impl Renderer {
         return full_transformation;
     }
 
-    pub fn render(&self, render_information: &RenderInformation, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f64>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+    fn get_mesh_vertex_indices(&self) -> Vec<usize> {
+
+
+        // shud proly precompute this
+
+        let mut idx_vec: Vec<usize> = Vec::new();    
+
+        for mesh in &self.world.elements {
+            idx_vec.push(mesh.num_vertices());
+        }
+
+        idx_vec
+    }
 
 
 
+    pub fn render(&self, render_information: &RenderInformation, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
 
-        self.compute_vertex_screen_coordinates(render_information);
+        pixel_buffer.fill(0x87CEFA);
 
+
+
+        /*
+        
+         
+        let idx_vec = self.get_mesh_vertex_indices();
+
+        // compute vertices
+        let vertices = self.compute_vertex_screen_coordinates(render_information, screen_width, screen_height);
+
+        let mut idx_offset = 0;
+
+        let color = 0xFF0000;
+        for (i,mesh) in self.world.elements.iter().enumerate() {
+
+            for face in mesh.faces() {
+
+                let p0 = vertices[(face.vertex_ids[0] + idx_offset) as usize].xy();
+                let p1 = vertices[(face.vertex_ids[1] + idx_offset) as usize].xy();
+                let p2 = vertices[(face.vertex_ids[2] + idx_offset) as usize].xy();
+
+
+            
+                let line = Line::from_vec(p0, p1, color);
+                line.draw(pixel_buffer, screen_width, screen_height);
+
+                let line = Line::from_vec(p1, p2, color);
+                line.draw(pixel_buffer, screen_width, screen_height);
+
+                let line = Line::from_vec(p2, p0, color);
+                line.draw(pixel_buffer, screen_width, screen_height);
+
+            }
+
+            idx_offset += idx_vec[i] as i64;
+        }
+
+
+        return;
+
+        */
 
 
 
@@ -274,7 +337,7 @@ impl Renderer {
 
 
         //pixel_buffer.fill(0x000000);
-        pixel_buffer.fill(0x87CEFA);
+
         depth_buffer.fill(-INFINITY);
 
         let full_transformation = self.calculate_transformation();
@@ -294,17 +357,19 @@ impl Renderer {
 
         // draw wirefram instead of faces
         //if use_wireframe {
-            let collected_data: Vec<Vec<Vec<Vector4<f64>>>> = 
+            let collected_data: Vec<Vec<Vec<Vector4<f32>>>> = 
             self.world.elements.par_chunks(fragment_size).map(
                 |chunk| {
     
-                    let mut thread_data: Vec<Vec<Vector4<f64>>> = Vec::new();
+                    let mut thread_data: Vec<Vec<Vector4<f32>>> = Vec::new();
                     for mesh in chunk.iter() {
                         thread_data.push(self.calculate_mesh_wireframe(mesh, full_transformation, screen_width, screen_height));
                     }
                     thread_data
                 }
             ).collect();
+
+            
     
             for i in collected_data.iter(){
                 for j in i.iter(){
@@ -314,6 +379,7 @@ impl Renderer {
                     }
                 }
             }
+
 
             //return;
         //}
@@ -335,11 +401,11 @@ impl Renderer {
 
         /*
         // face rendering
-        let collected_data: Vec<Vec<Vec<Vector4<Vector2<f64>>>>> = 
+        let collected_data: Vec<Vec<Vec<Vector4<Vector2<f32>>>>> = 
         self.world.elements.par_chunks(fragment_size).map(
             |chunk| {
 
-                let mut thread_data:  Vec<Vec<Vector4<Vector2<f64>>>> = Vec::new();
+                let mut thread_data:  Vec<Vec<Vector4<Vector2<f32>>>> = Vec::new();
                 for mesh in chunk.iter() {
                     thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
                 }
@@ -369,12 +435,12 @@ impl Renderer {
     }
 
 
-    fn calculate_mesh_wireframe(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) -> Vec<Vector4<f64>>{
-        let width = screen_width as f64;
-        let height = screen_height as f64;
+    fn calculate_mesh_wireframe(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f32>, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>>{
+        let width = screen_width as f32;
+        let height = screen_height as f32;
 
 
-        let mut mesh_data: Vec<Vector4<f64>> = Vec::new();
+        let mut mesh_data: Vec<Vector4<f32>> = Vec::new();
 
 
         // if not in view, dont render
@@ -382,8 +448,8 @@ impl Renderer {
             return mesh_data;
         }
         
-        let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
-        let mut w_vals: Vec<f64> = Vec::new();
+        let mut transformed_vertices: Vec<Vector4<f32>> = Vec::new();
+        let mut w_vals: Vec<f32> = Vec::new();
         for point in mesh.vertices(){
             let transformed_vertex = full_transformation * point.position;
             w_vals.push(transformed_vertex[3]);
@@ -424,12 +490,12 @@ impl Renderer {
         mesh_data
     }
 
-    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f64>, screen_width: i64, screen_height: i64) ->  Vec<Vector4<Vector2<f64>>>{
-        let width = screen_width as f64;
-        let height = screen_height as f64;
+    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f32>, screen_width: i64, screen_height: i64) ->  Vec<Vector4<Vector2<f32>>>{
+        let width = screen_width as f32;
+        let height = screen_height as f32;
 
 
-        let mut mesh_data: Vec<Vector4<Vector2<f64>>> = Vec::new();
+        let mut mesh_data: Vec<Vector4<Vector2<f32>>> = Vec::new();
 
 
         // if not in view, dont render
@@ -437,8 +503,8 @@ impl Renderer {
             return mesh_data;
         }
         
-        let mut transformed_vertices: Vec<Vector4<f64>> = Vec::new();
-        let mut w_vals: Vec<f64> = Vec::new();
+        let mut transformed_vertices: Vec<Vector4<f32>> = Vec::new();
+        let mut w_vals: Vec<f32> = Vec::new();
         for point in mesh.vertices(){
             let transformed_vertex = full_transformation * point.position;
             w_vals.push(transformed_vertex[3]);
@@ -450,7 +516,7 @@ impl Renderer {
         for face in mesh.faces(){
 
             // the 4th vector2 represents depth, as a centroid
-            let mut face_data: Vector4<Vector2<f64>> = Vector4::new(
+            let mut face_data: Vector4<Vector2<f32>> = Vector4::new(
                 Vector2::new(0.,0.,),
                 Vector2::new(0.,0.,),
                 Vector2::new(0.,0.,),
@@ -486,9 +552,15 @@ impl Renderer {
         mesh_data
     }
 
-    fn compute_vertex_screen_coordinates (&self, render_information: &RenderInformation) {
+    fn compute_vertex_screen_coordinates (&self, render_information: &RenderInformation, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>> {
         // gpu calls
         
+
+        let push_constant_range = PushConstantRange {
+    stages: ShaderStages::COMPUTE, // Use in a compute shader
+    offset: 0,
+    size: std::mem::size_of::<PushConstants>() as u32,
+};
 
 
         /*
@@ -501,6 +573,7 @@ impl Renderer {
                 raw_vertex_data.push(vertice.position.cast::<f32>());
             }
         }
+
         let buffer_size = (raw_vertex_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
 
         let vertex_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
@@ -514,7 +587,7 @@ impl Renderer {
                 ..Default::default()
             },
             raw_vertex_data
-            .iter() // Iterate over `Vec<[f64; 4]>`
+            .iter() // Iterate over `Vec<[f32; 4]>`
             .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
 
         ).expect("failed to cretae staging buffer");
@@ -546,36 +619,12 @@ impl Renderer {
         ).expect("Failed to create readback buffer!");
         
 
-
-
-/*
-
-*/
-
-
         /*
             Transform Buffer
          */
 
         let mat = self.calculate_transformation().cast::<f32>();
 
-        // let transform_staging_buffer = Buffer::new_sized(
-        //     render_information.memory_allocator.clone(),
-        //     BufferCreateInfo {
-        //         usage: BufferUsage::TRANSFER_SRC, // UBO usage
-        //         ..Default::default()
-        //     },
-        //     AllocationCreateInfo {
-        //         memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
-        //         ..Default::default()
-        //     },
-        // )
-        // .expect("Failed to create uniform buffer");
-
-        // let mut mapped = transform_staging_buffer.write().unwrap();
-        // *mapped = Transformation {
-        //     transform_matrix: mat.into(), // Convert nalgebra Matrix4 to [[f32; 4]; 4]
-        // };
 
         let transform_staging_buffer = Buffer::from_data(
             render_information.memory_allocator.clone(),
@@ -631,7 +680,7 @@ impl Renderer {
             render_information.device.clone(),
             PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
                 .into_pipeline_layout_create_info(render_information.device.clone())
-                .unwrap(),
+                .unwrap()
         )
         .unwrap();
     
@@ -661,8 +710,6 @@ impl Renderer {
             [
                 WriteDescriptorSet::buffer(0, vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(1, transform_buffer.clone()),
-
-                
                 //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
                 ], 
             [],
@@ -674,22 +721,20 @@ impl Renderer {
         // .unwrap()
 
 
-    
+        let push_constants = PushConstants {
+            a: screen_width as f32,
+            b: screen_height as f32,  
+        };
        
     
         command_buffer_builder
             .copy_buffer(CopyBufferInfo::buffers(vertex_staging_buffer.clone(), vertex_buffer.clone()))
             .unwrap()
-                   
-            // this copy right here caueses the cpu write issue
             .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
             .unwrap()
-
-
-
-
             .bind_pipeline_compute(compute_pipeline.clone())
             .unwrap()
+            .push_constants(compute_pipeline.layout().clone(), 0, push_constants).unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Compute,
                 compute_pipeline.layout().clone(),
@@ -712,17 +757,12 @@ impl Renderer {
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
     
-        let content = vertex_readback_buffer.read().unwrap();
-        for (n, val) in content.iter().enumerate() {
-            println!("{}, {:?}", n, *val);
-        }
-    
-        println!("Everything succeeded!");
-
-    
+    let content = vertex_readback_buffer.read().unwrap();
 
 
+    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v).cast::<f32>()).collect();
 
+    out
     }
 
 }
