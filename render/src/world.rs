@@ -10,6 +10,7 @@ pub struct World{
     pub width: i64,
     pub depth: i64,
     pub elements: Vec<Box<dyn Mesh>>,
+    pub idx_vec_running: Vec<usize>,
 }
 
 impl World{
@@ -32,7 +33,7 @@ impl World{
 
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
-        //test with a row of cubes
+        // //test with a row of cubes
         let side_length = 5.9;
         let amount_wide = 25;
         let amount_high = 25;
@@ -59,8 +60,22 @@ impl World{
 
 
         
+        let mut running_total = 0;
+
+        let mut idx_vec_running: Vec<usize> = Vec::new();    
+
+        for mesh in &elements {
+            
+            idx_vec_running.push(running_total);
+
+            running_total += mesh.num_vertices();
+        }
+
+
+
+        
         World {
-            height, width, depth, elements
+            height, width, depth, elements, idx_vec_running,
         }
     }
 

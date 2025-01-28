@@ -4,17 +4,57 @@ use vulkano::device::{Device, Queue};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer};
 use vulkano::memory::allocator::{StandardMemoryAllocator,AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
+use std::fs::File;
+use std::io::Read;
+use vulkano::shader::ShaderModule;
+use vulkano::pipeline::{ComputePipeline, PipelineShaderStageCreateInfo};
+use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
+use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
+use vulkano::pipeline::compute::ComputePipelineCreateInfo;
+use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
+use vulkano::pipeline::Pipeline;
+use vulkano::descriptor_set::layout::DescriptorSetLayout;
+
+use crate::primitives::line;
+use crate::renderer::Transformation;
+
+use nalgebra::Vector4;
+
+
+
+
+
+
 
 pub struct RenderInformation {
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: StandardCommandBufferAllocator,
     pub memory_allocator: Arc<StandardMemoryAllocator>,
+    pub vertex_compute_pipeline: Arc<ComputePipeline>,
+    pub line_draw_compute_pipeline: Arc<ComputePipeline>,
+   
+
 }
 
 impl RenderInformation {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+    fn load_shader(device: Arc<vulkano::device::Device>, path: &str) -> Arc<ShaderModule> {
+        let mut file = File::open(path).expect("Failed to open shader file");
+        let mut shader_bytes = Vec::new();
+        file.read_to_end(&mut shader_bytes).unwrap();
+
+        unsafe { ShaderModule::from_bytes(device.clone(), &shader_bytes) }
+            .expect("Failed to create shader module")
+    }
+
+
+    pub fn fill_vertex_buffer(&self) {
+        
+    }
+
+
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, raw_vertex_data: &Vec<Vector4<f32>>) -> Self {
 
         // Memory Allocator (Reuse across frames)
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
@@ -24,11 +64,57 @@ impl RenderInformation {
 
         // Create Buffer (Keep the same buffer across frames)
 
+        let vertex_shader = RenderInformation::load_shader(device.clone(), "src/shaders/comp.spv");
+        let vertex_entry_point = vertex_shader.entry_point("main").unwrap();
+        let stage = PipelineShaderStageCreateInfo::new(vertex_entry_point);
+        let layout = PipelineLayout::new(
+            device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap()
+        )
+        .unwrap();
+
+        let vertex_compute_pipeline = ComputePipeline::new(
+            device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(stage, layout),
+        )
+        .expect("failed to create compute pipeline");
+
+
+        let line_draw_shader = RenderInformation::load_shader(device.clone(), "src/shaders/line_draw.spv");
+        let line_draw_entry_point = line_draw_shader.entry_point("main").unwrap();
+        let stage = PipelineShaderStageCreateInfo::new(line_draw_entry_point);
+        let layout = PipelineLayout::new(
+            device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap()
+        )
+        .unwrap();
+
+        let line_draw_compute_pipeline = ComputePipeline::new(
+            device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(stage, layout),
+        )
+        .expect("failed to create compute pipeline");
+
+        /*
+            Transform Buffer
+            */
+
+
+
         Self {
             device,
             queue,
             command_buffer_allocator,
             memory_allocator,
+            vertex_compute_pipeline,
+            line_draw_compute_pipeline,
+
         }
     }
 

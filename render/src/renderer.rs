@@ -68,6 +68,7 @@ use vulkano::descriptor_set::layout::DescriptorBindingFlags; // Required for `bi
 
 
 
+
 use vulkano::shader::ShaderModule;
 use std::fs::File;
 use std::io::Read;
@@ -101,28 +102,338 @@ struct PushConstants {
     b: f32,
 }
 
+pub struct Buffers { 
+
+    // vertices
+    pub vertex_staging_buffer: Subbuffer<[[f32; 4]]>,
+    pub vertex_buffer: Subbuffer<[[f32; 4]]>,
+    pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
+
+    // rotation transform
+    pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
+    pub transform_buffer: Subbuffer<Transformation>,
+
+    //faces_buffer
+    pub face_staging_buffer: Subbuffer<[[usize; 4]]>,
+    pub face_buffer: Subbuffer<[[usize; 4]]>,
+
+
+    //in_view_buffer
+
+    //canvas
+    pub pixel_staging_buffer: Subbuffer<[u32]>,
+    pub pixel_buffer: Subbuffer<[u32]>,
+
+}
+
 pub struct Renderer{
     pub world: World,
     pub view: View,
+    pub render_information: RenderInformation,
+    pub buffers: Buffers,
+    pub frame_count: u64,
+    pub screen_width: usize,
+    pub screen_height: usize,
 }
 
 impl Renderer {
-    pub fn new(world: World, view: View) -> Renderer{
+
+
+// pass render information in
+
+    pub fn new(world: World, view: View, screen_width: usize, screen_height: usize) -> Renderer{
+
+
+
+        let library = VulkanLibrary::new().expect("no local Vulkan library/DLL");
+        let instance = Instance::new(
+            library,
+            InstanceCreateInfo {
+                flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
+                ..Default::default()
+            },
+        )
+        .expect("failed to create instance");
+    
+    
+        let physical_device = instance
+            .enumerate_physical_devices()
+            .expect("could not enumerate devices")
+            .next()
+            .expect("no devices available");
+    
+        let queue_family_index = physical_device
+        .queue_family_properties()
+        .iter()
+        .enumerate()
+        .position(|(_queue_family_index, queue_family_properties)| {
+            queue_family_properties.queue_flags.contains(QueueFlags::GRAPHICS)
+        })
+        .expect("couldn't find a graphical queue family") as u32;
+    
+        let (device, mut queues) = Device::new(
+            physical_device,
+            DeviceCreateInfo {
+                // here we pass the desired queue family to use by index
+                queue_create_infos: vec![QueueCreateInfo {
+                    queue_family_index,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        )
+        .expect("failed to create device");
+    
+        let queue = queues.next().unwrap();
+
+        
+        let mut raw_vertex_data: Vec<Vector4<f32>> = Vec::new();
+        // put all vertex data into one list, and decompose afterward
+        for mesh in &world.elements {
+            for vertice in mesh.vertices(){
+
+                raw_vertex_data.push(vertice.position.cast::<f32>());
+            }
+        }
+    
+        let render_information = RenderInformation::new(device.clone(), queue.clone(), &raw_vertex_data);
+
+
+
+        // create buffers
+        let buffer_size = (raw_vertex_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
+
+        let vertex_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            raw_vertex_data
+            .iter() // Iterate over `Vec<[f32; 4]>`
+            .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
+        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST, // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            raw_vertex_data.len() as u64, // Same size as vertex_buffer
+        ).expect("Failed to create readback buffer!");
+        
+
+
+        //let mat = self.calculate_transformation().cast::<f32>();
+
+        let mat: Matrix4<f32> = Matrix4::zeros();
+
+
+        let transform_staging_buffer_1 = Buffer::from_data(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            Transformation {
+                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
+            },
+        ).expect("Failed to create uniform buffer");
+
+        
+        let transform_staging_buffer_2 = Buffer::from_data(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            Transformation {
+                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
+            },
+        ).expect("Failed to create uniform buffer");
+
+
+        let transform_buffer: Subbuffer<Transformation> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            std::mem::size_of::<Transformation>() as u64
+        ).expect("Failed to create storage buffer!");
+        
+
+        let transform_staging_buffers = Vector2::new(
+            transform_staging_buffer_1,
+            transform_staging_buffer_2,
+        );
+
+
+
+        let mut face_data: Vec<Vector4<usize>> = Vec::new();
+        for (i,mesh) in world.elements.iter().enumerate() {
+            for face in mesh.faces(){
+                face_data.push(Vector4::new(
+                    face.vertex_ids[0] as usize,
+                    face.vertex_ids[1] as usize, 
+                    face.vertex_ids[2] as usize, 
+                    i
+                ));
+            }
+        }
+
+        let buffer_size = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
+
+        let face_staging_buffer: Subbuffer<[[usize; 4]]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            face_data
+            .iter() // Iterate over `Vec<[f32; 4]>`
+            .map(|&v| [v[0], v[1], v[2], v[3]]),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let face_buffer: Subbuffer<[[usize; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
+        /*
+         pixel buffer
+        */
+
+
+
+        let pixel_arr = vec![0u32; screen_width * screen_height];
+
+        let buffer_size = (pixel_arr.len() * std::mem::size_of::<i32>()) as u64;
+
+
+        let pixel_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            pixel_arr.iter().cloned(),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let pixel_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
+
+
+
+
+
+        // buffer encapsulation struct
+        let mut buffers = Buffers {
+            vertex_staging_buffer,
+            vertex_buffer,
+            vertex_readback_buffer,
+            transform_buffer,
+            transform_staging_buffers,
+            face_staging_buffer,
+            face_buffer,
+            pixel_staging_buffer,
+            pixel_buffer,
+        };
+
+
+
+        let frame_count = 0;
+
+
+
+
+
+
+
         Renderer{
             world,
             view,
+            render_information,
+            buffers,
+            frame_count,
+            screen_width,
+            screen_height,
         }
     }
 
-    
-    fn load_shader(device: Arc<vulkano::device::Device>, path: &str) -> Arc<ShaderModule> {
-        let mut file = File::open(path).expect("Failed to open shader file");
-        let mut shader_bytes = Vec::new();
-        file.read_to_end(&mut shader_bytes).unwrap();
-
-        unsafe { ShaderModule::from_bytes(device.clone(), &shader_bytes) }
-            .expect("Failed to create shader module")
-}
 
 
     pub fn clip_at_edge(x1: &mut f32, y1: &mut f32, x2: &mut f32, y2: &mut f32, screen_width: i64, screen_height: i64){
@@ -268,49 +579,56 @@ impl Renderer {
         return full_transformation;
     }
 
-    fn get_mesh_vertex_indices(&self) -> Vec<usize> {
 
+    pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
 
-        // shud proly precompute this
+        self.frame_count += 1;
 
-        let mut idx_vec: Vec<usize> = Vec::new();    
-
-        for mesh in &self.world.elements {
-            idx_vec.push(mesh.num_vertices());
-        }
-
-        idx_vec
-    }
-
-
-
-    pub fn render(&self, render_information: &RenderInformation, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+        // // to render we need
+        // /*
+        // 1. vertex buffer (dynamic)
+        // 2. connections buffer (static)
+        // 3. transform buffer (dynamic)
+        // 4. faces buffer, once applicable
+        //  */
 
         pixel_buffer.fill(0x87CEFA);
-
-
-
-        /*
-        
          
-        let idx_vec = self.get_mesh_vertex_indices();
+        //let idx_vec = self.get_mesh_vertex_indices();
 
         // compute vertices
-        let vertices = self.compute_vertex_screen_coordinates(render_information, screen_width, screen_height);
+        let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
 
-        let mut idx_offset = 0;
+
+        let mut in_vec: Vec<bool> = Vec::new();
+        for mesh in &self.world.elements {
+            if self.view.in_view(mesh){
+                in_vec.push(true);
+            }else {
+                in_vec.push(false);
+            }
+        }
+
+        // ignore in_view buffer for now
+
+        self.draw_wireframe(vertices, screen_width, screen_height);
+
+        return;
+
 
         let color = 0xFF0000;
         for (i,mesh) in self.world.elements.iter().enumerate() {
 
+            if !in_vec[i] {
+                continue;
+            }
+
             for face in mesh.faces() {
 
-                let p0 = vertices[(face.vertex_ids[0] + idx_offset) as usize].xy();
-                let p1 = vertices[(face.vertex_ids[1] + idx_offset) as usize].xy();
-                let p2 = vertices[(face.vertex_ids[2] + idx_offset) as usize].xy();
+                let p0 = vertices[ face.vertex_ids[0] as usize + self.world.idx_vec_running[i] ].xy();
+                let p1 = vertices[ face.vertex_ids[1] as usize + self.world.idx_vec_running[i] ].xy();
+                let p2 = vertices[ face.vertex_ids[2] as usize + self.world.idx_vec_running[i] ].xy();
 
-
-            
                 let line = Line::from_vec(p0, p1, color);
                 line.draw(pixel_buffer, screen_width, screen_height);
 
@@ -322,15 +640,9 @@ impl Renderer {
 
             }
 
-            idx_offset += idx_vec[i] as i64;
         }
 
-
         return;
-
-        */
-
-
 
 
 //////////////////////
@@ -552,152 +864,36 @@ impl Renderer {
         mesh_data
     }
 
-    fn compute_vertex_screen_coordinates (&self, render_information: &RenderInformation, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>> {
-        // gpu calls
-        
-
-        let push_constant_range = PushConstantRange {
-    stages: ShaderStages::COMPUTE, // Use in a compute shader
-    offset: 0,
-    size: std::mem::size_of::<PushConstants>() as u32,
-};
+    fn compute_vertex_screen_coordinates (&self, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>> {
 
 
-        /*
-            Vertex Buffers
-         */
-        let mut raw_vertex_data: Vec<Vector4<f32>> = Vec::new();
-        // put all vertex data into one list, and decompose afterward
-        for mesh in &self.world.elements {
-            for vertice in mesh.vertices(){
-                raw_vertex_data.push(vertice.position.cast::<f32>());
-            }
-        }
+        let mut write_lock = self.buffers.transform_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
 
-        let buffer_size = (raw_vertex_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
-
-        let vertex_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            raw_vertex_data
-            .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
-
-        ).expect("failed to cretae staging buffer");
-
-        let vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST, // Transfer destination for readback
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
-                ..Default::default()
-            },
-            raw_vertex_data.len() as u64, // Same size as vertex_buffer
-        ).expect("Failed to create readback buffer!");
-        
-
-        /*
-            Transform Buffer
-         */
-
-        let mat = self.calculate_transformation().cast::<f32>();
+        write_lock.transform_matrix = self.calculate_transformation().into();
 
 
-        let transform_staging_buffer = Buffer::from_data(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC, // UBO usage
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
-                ..Default::default()
-            },
-            Transformation {
-                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
-            },
-        ).expect("Failed to create uniform buffer");
-
-
-        let transform_buffer: Subbuffer<Transformation> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            std::mem::size_of::<Transformation>() as u64
-        ).expect("Failed to create storage buffer!");
-        
 
 
  
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-            &render_information.command_buffer_allocator,
-            render_information.queue.queue_family_index(),
+            &self.render_information.command_buffer_allocator,
+            self.render_information.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
     
 
-        let work_group_counts = [1024, 1, 1];
-
-    
-    
-        let shader = Renderer::load_shader(render_information.device.clone(), "src/shaders/comp.spv");
-        //let shader = cs::load(device.clone()).expect("failed to create shader module");
-        let cs = shader.entry_point("main").unwrap();
+        let work_group_counts = [256, 1, 1];
 
 
-        let stage = PipelineShaderStageCreateInfo::new(cs);
-        let layout = PipelineLayout::new(
-            render_information.device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
-                .into_pipeline_layout_create_info(render_information.device.clone())
-                .unwrap()
-        )
-        .unwrap();
-    
-        let compute_pipeline = ComputePipeline::new(
-            render_information.device.clone(),
-            None,
-            ComputePipelineCreateInfo::stage_layout(stage, layout),
-        )
-        .expect("failed to create compute pipeline");
-
-    
         let descriptor_set_allocator =
-            StandardDescriptorSetAllocator::new(render_information.device.clone(), Default::default());
+            StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
     
-        let pipeline_layout = compute_pipeline.layout();
+        let pipeline_layout = self.render_information.vertex_compute_pipeline.layout();
         let descriptor_set_layouts = pipeline_layout.set_layouts();
     
+  
+        
 
         let descriptor_set_layout_index = 0;
         let descriptor_set_layout = descriptor_set_layouts
@@ -708,8 +904,8 @@ impl Renderer {
             &descriptor_set_allocator,
             descriptor_set_layout.clone(),
             [
-                WriteDescriptorSet::buffer(0, vertex_buffer.clone()),
-                WriteDescriptorSet::buffer(1, transform_buffer.clone()),
+                WriteDescriptorSet::buffer(0, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(1, self.buffers.transform_buffer.clone()),
                 //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
                 ], 
             [],
@@ -728,42 +924,130 @@ impl Renderer {
        
     
         command_buffer_builder
-            .copy_buffer(CopyBufferInfo::buffers(vertex_staging_buffer.clone(), vertex_buffer.clone()))
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_staging_buffer.clone(), self.buffers.vertex_buffer.clone()))
             .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.transform_staging_buffers[((self.frame_count+1) %2) as usize].clone(), self.buffers.transform_buffer.clone()))
             .unwrap()
-            .bind_pipeline_compute(compute_pipeline.clone())
+            .bind_pipeline_compute(self.render_information.vertex_compute_pipeline.clone())
             .unwrap()
-            .push_constants(compute_pipeline.layout().clone(), 0, push_constants).unwrap()
+            .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants).unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Compute,
-                compute_pipeline.layout().clone(),
+                self.render_information.vertex_compute_pipeline.layout().clone(),
                 descriptor_set_layout_index as u32,
                 descriptor_set,
             )
             .unwrap()
             .dispatch(work_group_counts)
             .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(vertex_buffer.clone(), vertex_readback_buffer.clone())) // Copy back to CPU
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
             .unwrap();
         
         let command_buffer = command_buffer_builder.build().unwrap();
     
-        let future = sync::now(render_information.device.clone())
-        .then_execute(render_information.queue.clone(), command_buffer)
+        let future = sync::now(self.render_information.device.clone())
+        .then_execute(self.render_information.queue.clone(), command_buffer)
         .unwrap()
         .then_signal_fence_and_flush()
         .unwrap();
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
     
-    let content = vertex_readback_buffer.read().unwrap();
+    let content = self.buffers.vertex_readback_buffer.read().unwrap();
 
 
-    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v).cast::<f32>()).collect();
+    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
 
     out
     }
 
+
+    fn draw_wireframe(&self, vertices: Vec<Vector4<f32>>, screen_width: i64, screen_height: i64) {
+
+
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            &self.render_information.command_buffer_allocator,
+            self.render_information.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+    
+
+        let work_group_counts = [256, 1, 1];
+
+
+        let descriptor_set_allocator =
+            StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
+    
+        let pipeline_layout = self.render_information.line_draw_compute_pipeline.layout();
+        let descriptor_set_layouts = pipeline_layout.set_layouts();
+
+  
+
+        let descriptor_set_layout_index = 0;
+        let descriptor_set_layout = descriptor_set_layouts
+            .get(descriptor_set_layout_index)
+            .unwrap();
+
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            descriptor_set_layout.clone(),
+            [
+                WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.transform_buffer.clone()),
+                //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
+                ], 
+            [],
+        )
+        .unwrap();
+
+               
+        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+        // .unwrap()
+
+
+        let push_constants = PushConstants {
+            a: screen_width as f32,
+            b: screen_height as f32,  
+        };
+       
+    
+        command_buffer_builder
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_staging_buffer.clone(), self.buffers.vertex_buffer.clone()))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.transform_staging_buffers[((self.frame_count+1) %2) as usize].clone(), self.buffers.transform_buffer.clone()))
+            .unwrap()
+            .bind_pipeline_compute(self.render_information.vertex_compute_pipeline.clone())
+            .unwrap()
+            .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants).unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                self.render_information.vertex_compute_pipeline.layout().clone(),
+                descriptor_set_layout_index as u32,
+                descriptor_set,
+            )
+            .unwrap()
+            .dispatch(work_group_counts)
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
+            .unwrap();
+        
+        let command_buffer = command_buffer_builder.build().unwrap();
+    
+        let future = sync::now(self.render_information.device.clone())
+        .then_execute(self.render_information.queue.clone(), command_buffer)
+        .unwrap()
+        .then_signal_fence_and_flush()
+        .unwrap();
+    
+    future.wait(None).unwrap();  // Ensures GPU completion before reading
+    
+    let content = self.buffers.vertex_readback_buffer.read().unwrap();
+
+
+    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
+
+
+    }
 }
 

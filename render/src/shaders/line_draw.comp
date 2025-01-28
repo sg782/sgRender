@@ -1,0 +1,51 @@
+
+/*
+Line drawing shader
+
+Necessary informaiton
+ 1. boolean in_view buffer
+ 2. integer vertice_count_buffer
+ 3. faces buffer
+ 4. screen width/height
+ 5. output buffer (for screen)
+
+*/
+
+layout(push_constant) uniform PushConstants {
+    float screen_width;
+    float screen_height;
+} push;
+
+layout(set = 0, binding = 0) buffer Faces {
+    // first 3 values are vertex indices (relative to mesh), 
+    // last value is the idx of the mesh
+    vec4 ids[];
+} faces;
+
+layout(set = 0, binding = 1) buffer InView {
+    uint data[]; // 0 or 1, if in view
+} in_view;
+
+layout(set = 0, binding = 2) buffer VerticeCount{
+    uint data[];
+} vertice_count;
+
+
+/*
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+
+    vec4 face = faces.ids[idx]; // get face
+
+
+    if(!in_view_buffer[face[3]]){
+        return;
+    }
+
+    // draw line
+    
+}
+
+
+*/
