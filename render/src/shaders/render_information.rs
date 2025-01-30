@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use vulkano::device::{Device, Queue};
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer};
-use vulkano::memory::allocator::{StandardMemoryAllocator,AllocationCreateInfo, MemoryTypeFilter};
+use vulkano::memory::allocator::{StandardMemoryAllocator};
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use std::fs::File;
 use std::io::Read;
@@ -11,12 +10,7 @@ use vulkano::pipeline::{ComputePipeline, PipelineShaderStageCreateInfo};
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
 use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
 use vulkano::pipeline::compute::ComputePipelineCreateInfo;
-use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
-use vulkano::pipeline::Pipeline;
-use vulkano::descriptor_set::layout::DescriptorSetLayout;
 
-use crate::primitives::line;
-use crate::renderer::Transformation;
 
 use nalgebra::Vector4;
 
@@ -64,7 +58,7 @@ impl RenderInformation {
 
         // Create Buffer (Keep the same buffer across frames)
 
-        let vertex_shader = RenderInformation::load_shader(device.clone(), "src/shaders/comp.spv");
+        let vertex_shader = RenderInformation::load_shader(device.clone(), "src/shaders/vertices.spv");
         let vertex_entry_point = vertex_shader.entry_point("main").unwrap();
         let stage = PipelineShaderStageCreateInfo::new(vertex_entry_point);
         let layout = PipelineLayout::new(
@@ -85,19 +79,25 @@ impl RenderInformation {
 
         let line_draw_shader = RenderInformation::load_shader(device.clone(), "src/shaders/line_draw.spv");
         let line_draw_entry_point = line_draw_shader.entry_point("main").unwrap();
-        let stage = PipelineShaderStageCreateInfo::new(line_draw_entry_point);
-        let layout = PipelineLayout::new(
+        let line_stage = PipelineShaderStageCreateInfo::new(line_draw_entry_point);
+
+
+        
+
+        let line_layout = PipelineLayout::new(
             device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&line_stage])
                 .into_pipeline_layout_create_info(device.clone())
                 .unwrap()
         )
         .unwrap();
 
+
+
         let line_draw_compute_pipeline = ComputePipeline::new(
             device.clone(),
             None,
-            ComputePipelineCreateInfo::stage_layout(stage, layout),
+            ComputePipelineCreateInfo::stage_layout(line_stage, line_layout),
         )
         .expect("failed to create compute pipeline");
 

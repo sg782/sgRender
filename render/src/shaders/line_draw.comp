@@ -1,3 +1,4 @@
+#version 460
 
 /*
 Line drawing shader
@@ -11,41 +12,101 @@ Necessary informaiton
 
 */
 
+
+
 layout(push_constant) uniform PushConstants {
     float screen_width;
     float screen_height;
 } push;
 
+
+
 layout(set = 0, binding = 0) buffer Faces {
     // first 3 values are vertex indices (relative to mesh), 
     // last value is the idx of the mesh
-    vec4 ids[];
+    uvec4 ids[];
 } faces;
 
-layout(set = 0, binding = 1) buffer InView {
-    uint data[]; // 0 or 1, if in view
+
+layout(set = 0, binding = 1) buffer RunningVerticeCount{
+    uint data[];
+} running_vertice_count;
+
+layout(set = 0, binding = 2) buffer PixelBuffer {
+    uint data[];
+} pixel_buffer;
+
+layout(set = 0, binding = 3) buffer InView {
+    uint data[];
 } in_view;
 
-layout(set = 0, binding = 2) buffer VerticeCount{
-    uint data[];
-} vertice_count;
+layout(set = 0, binding = 4) buffer VertexData {
+    vec4 data[];
+} vertex_data;
+
+layout(set = 0, binding = 5, rgba8) uniform writeonly image2D img;
 
 
-/*
-
-void main() {
-    uint idx = gl_GlobalInvocationID.x;
-
-    vec4 face = faces.ids[idx]; // get face
 
 
-    if(!in_view_buffer[face[3]]){
-        return;
+
+void draw_line(uint v_a_idx, uint v_b_idx) {
+    // clip lines later
+
+    vec4 start = vertex_data.data[v_a_idx];
+    vec4 end = vertex_data.data[v_b_idx];
+
+    // use float for now, if precision is an issue for some reason, we will use double
+    float dy = end[1] - start[1];
+    float dx = end[0] - start[0];
+
+    if(dy ==0. && dx==0.){
+        uint x = uint(start[0]);
+        uint y = uint(start[1]);
+
+        if(y<0 || y>=push.screen_height || x<0 || x>=push.screen_width) {
+            return;
+        }
+
+        uint index = (y*uint(push.screen_width) + x);
+        pixel_buffer.data[index] = 0xFFFFFF;
     }
 
-    // draw line
-    
+    vec4 to_write = vec4(vec3(1.0), 1.0);
+    imageStore(img, ivec2(0), to_write);
+
 }
 
 
-*/
+void main() {
+
+    uint idx = gl_GlobalInvocationID.x;
+
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    vec4 to_write = vec4(0.0, 1.0, 1.0, 1.0); // GREEN instead of white
+    imageStore(img, pixel, to_write);
+
+    uvec4 face = faces.ids[idx]; // get face
+
+    if(in_view.data[idx]==0){ // return early if not in view
+        return;
+    }
+
+    // get the indices of each vertex, factoring in offset from how we store the data
+    uint v_0_idx = face[0] + running_vertice_count.data[face[3]];
+    uint v_1_idx = face[1] + running_vertice_count.data[face[3]];
+    uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
+
+
+    draw_line(v_0_idx,v_1_idx);
+    draw_line(v_1_idx,v_2_idx);
+    draw_line(v_2_idx,v_0_idx);
+
+
+    // vec4 vert = vertex_data.data[0];
+
+    // uint vertex_count = running_vertice_count.data[0]; // Read first count
+    // pixel_buffer.data[idx] = vertex_count * int(push.screen_width) * int(push.screen_height); 
+}
+
+

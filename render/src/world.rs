@@ -6,20 +6,13 @@ use std::sync::Arc;
 use crate::models::imported::Imported;
 
 pub struct World{
-    pub height: i64,
-    pub width: i64,
-    pub depth: i64,
     pub elements: Vec<Box<dyn Mesh>>,
-    pub idx_vec_running: Vec<usize>,
+    pub idx_vec_running: Vec<u32>,
 }
 
 impl World{
 
-    pub fn new(
-        height: i64,
-        width: i64,
-        depth: i64,
-    ) -> World {
+    pub fn new() -> World {
 
 
         /*
@@ -62,20 +55,20 @@ impl World{
         
         let mut running_total = 0;
 
-        let mut idx_vec_running: Vec<usize> = Vec::new();    
+        let mut idx_vec_running: Vec<u32> = Vec::new();    
 
         for mesh in &elements {
             
             idx_vec_running.push(running_total);
 
-            running_total += mesh.num_vertices();
+            running_total += mesh.num_vertices() as u32;
         }
 
 
 
         
         World {
-            height, width, depth, elements, idx_vec_running,
+            elements, idx_vec_running,
         }
     }
 

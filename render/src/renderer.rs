@@ -1,29 +1,25 @@
 use std::f32::INFINITY;
+use std::fmt::Write;
 
 use crate::world::World;
 use crate::view::View;
-use nalgebra::Transform;
 use nalgebra::Vector2;
 use rayon::prelude::*;
-use vulkano::descriptor_set;
-use vulkano::descriptor_set::layout::DescriptorSetLayoutBinding;
+use vulkano::image::ImageCreateInfo;
 use crate::mesh::mesh::Mesh;
 
 use crate::primitives::line::Line;
 
-use std::collections::BTreeMap;
+use vulkano::image::sys::RawImage;
+use crate::primitives::triangle::Triangle;
+use std::sync::Arc;
+
+use bytemuck::cast_slice;
+
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
 
-use crate::primitives::triangle::Triangle;
-
-use nalgebra::Vector3;
-
-
-use std::sync::{Arc, Mutex};
-
-use std::fs;
 
 use vulkano::VulkanLibrary;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
@@ -31,47 +27,22 @@ use vulkano::device::QueueFlags;
 
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 
-use vulkano::memory::allocator::StandardMemoryAllocator;
-
-
-use vulkano::descriptor_set::layout::{DescriptorSetLayout,DescriptorSetLayoutCreateInfo,DescriptorType};
-use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
-use vulkano::shader::ShaderStages;
-
-use vulkano::pipeline::layout::{PushConstantRange};
 
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 
-use vulkano::command_buffer::allocator::{
-    StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
-};
+
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferInfo};
 
 use vulkano::sync::{self, GpuFuture};
 
+use vulkano::descriptor_set::DescriptorSet;
 
 use vulkano::pipeline::Pipeline;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::pipeline::PipelineBindPoint;
 
-use vulkano::pipeline::compute::ComputePipelineCreateInfo;
-use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
-use vulkano::pipeline::{ComputePipeline, PipelineShaderStageCreateInfo};
-
-use vulkano::sync::{PipelineStages, AccessFlags};
-
-
-use vulkano::descriptor_set::layout::DescriptorBindingFlags; // Required for `binding_flags`
-
-
-
-
-
-use vulkano::shader::ShaderModule;
-use std::fs::File;
-use std::io::Read;
 use bytemuck::{Pod, Zeroable};
 
 use crate::shaders::render_information::RenderInformation;
@@ -79,7 +50,18 @@ use crate::shaders::render_information::RenderInformation;
 use vulkano::buffer::Subbuffer;
 
 use num_cpus;
+use vulkano::command_buffer::CopyImageToBufferInfo;
 
+
+use vulkano::image::ImageType;
+
+use minifb::{Key, Window, WindowOptions};
+
+
+use vulkano::image::{Image, ImageUsage, view::ImageView};
+use vulkano::format::Format;
+use vulkano::device::Queue;
+use vulkano::memory::allocator::{StandardMemoryAllocator, MemoryAllocator};
 /*
 RIGHT HANDED COORDINATE SYSTEM:
 
@@ -114,15 +96,19 @@ pub struct Buffers {
     pub transform_buffer: Subbuffer<Transformation>,
 
     //faces_buffer
-    pub face_staging_buffer: Subbuffer<[[usize; 4]]>,
-    pub face_buffer: Subbuffer<[[usize; 4]]>,
+    pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
+    pub face_buffer: Subbuffer<[[u32; 4]]>,
 
+    // running vertices
+    pub running_vertice_staging_buffer: Subbuffer<[u32]>,
+    pub running_vertice_buffer: Subbuffer<[u32]>,
 
     //in_view_buffer
 
     //canvas
     pub pixel_staging_buffer: Subbuffer<[u32]>,
     pub pixel_buffer: Subbuffer<[u32]>,
+    pub pixel_readback_buffer: Subbuffer<[u32]>,
 
 }
 
@@ -238,7 +224,7 @@ impl Renderer {
         let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST, // Transfer destination for readback
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
                 ..Default::default()
             },
             AllocationCreateInfo {
@@ -322,7 +308,7 @@ impl Renderer {
 
         let buffer_size = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
 
-        let face_staging_buffer: Subbuffer<[[usize; 4]]> = Buffer::from_iter( 
+        let face_staging_buffer: Subbuffer<[[u32; 4]]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
@@ -334,12 +320,12 @@ impl Renderer {
             },
             face_data
             .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0], v[1], v[2], v[3]]),
+            .map(|&v| [v[0] as u32, v[1] as u32, v[2] as u32, v[3] as u32]),
 
         ).expect("failed to cretae staging buffer");
 
         
-        let face_buffer: Subbuffer<[[usize; 4]]> = Buffer::new_unsized(
+        let face_buffer: Subbuffer<[[u32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
@@ -367,16 +353,9 @@ impl Renderer {
 
         let pixel_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
+            BufferCreateInfo {usage: BufferUsage::TRANSFER_SRC, ..Default::default()},
+            AllocationCreateInfo {memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,..Default::default()},
             pixel_arr.iter().cloned(),
-
         ).expect("failed to cretae staging buffer");
 
         
@@ -393,24 +372,72 @@ impl Renderer {
             buffer_size
         ).expect("Failed to create storage buffer!");
 
+        let pixel_readback_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            buffer_size, // Same size as vertex_buffer
+        ).expect("Failed to create readback buffer!");
+        
 
 
+        let vertice_indices = &world.idx_vec_running;
+
+        let running_vertice_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            vertice_indices.iter().cloned(),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let running_vertice_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            vertice_indices.len() as u64,
+        ).expect("Failed to create storage buffer!");
 
 
 
 
 
         // buffer encapsulation struct
-        let mut buffers = Buffers {
+        let buffers = Buffers {
             vertex_staging_buffer,
             vertex_buffer,
             vertex_readback_buffer,
             transform_buffer,
             transform_staging_buffers,
+
             face_staging_buffer,
             face_buffer,
+
+            running_vertice_staging_buffer,
+            running_vertice_buffer,
+
             pixel_staging_buffer,
             pixel_buffer,
+            pixel_readback_buffer,
         };
 
 
@@ -517,6 +544,90 @@ impl Renderer {
 
     }
 
+
+    // not correct rn
+    pub fn point_clip_at_edge(p0: &mut Vector2<f32>, p1: &mut Vector2<f32>, screen_width: i64, screen_height: i64){
+
+        let width = screen_width as f32;
+        let height =screen_height as f32;
+
+        if(p0[0] <=0. && p1[0] <=0.){
+            return;
+        }
+        if(p0[0] >=width-1. && p1[0]>= width-1.){
+            return;
+        }
+
+        if(p0[1] <=0. && p1[1] <= 0.){
+            return;
+        }
+        if(p0[1] >=height-1. && p1[1]>= height-1.){
+            return;
+        }
+
+
+        // x
+        if p0[0] < 0. {
+            let scaling = p1[0] / (p1[0]-p0[0]);
+
+
+            let dy = p1[1] - p0[1];
+
+            p0[0] = 0.;
+            p0[1] = p1[1] - (scaling * dy);
+        } else if p0[0] >= width {
+            let scaling = (width - p1[0]) / (p0[0] - p1[0]);
+            let dy = p1[1] -  p0[1];
+            p0[0] = width-1.;
+            p0[1] = p1[1] - (scaling * dy);
+        }
+
+        if p1[0] <0. {
+            let scaling = p0[0] / (p0[0]-p1[0]);
+            let dy = p0[1] - p1[1];
+
+            p1[0] = 0.;
+            p1[1] = p0[1] - (scaling * dy);
+        }else if p1[0] >= width {
+            let scaling = (width - p0[0]) / (p1[0] - p0[0]);
+            let dy = p0[1] -  p1[1];
+            p1[0] = width-1.;
+            p1[1] = p0[1] - (scaling * dy);
+        }
+
+
+        // y
+        if p0[1] < 0. {
+            let scaling = p1[1] / (p1[1]-p0[1]);
+            let dx = p1[0] - p0[0];
+
+            p0[1] = 0.;
+            p0[0] = p1[0] - (scaling * dx);
+        }else if p0[1] >= height {
+            let scaling = (height - p1[1]) / (p0[1] - p1[1]);
+            let dx = p1[0] -  p0[0];
+            p0[1] = height-1.;
+            p0[0] = p1[0] - (scaling * dx);
+        }
+
+        if p1[1] <0. {
+            let scaling = p0[1] / (p0[1]-p1[1]);
+            let dx = p0[0] - p1[0];
+
+            p1[1] = 0.;
+            p1[0] = p0[0] - (scaling * dx);
+        } else if p1[1] >= height {
+            let scaling = (height - p0[1]) / (p1[1] - p0[1]);
+            let dx = p0[0] -  p1[0];
+            p1[1] = height-1.;
+            p1[0] = p0[0] - (scaling * dx);
+        }
+
+
+
+    }
+
+
     pub fn calculate_transformation(&self) -> Matrix4<f32>{
 
         let near = self.view.near;
@@ -580,7 +691,7 @@ impl Renderer {
     }
 
 
-    pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+    pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, window: &mut Window,depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
 
         self.frame_count += 1;
 
@@ -597,52 +708,63 @@ impl Renderer {
         //let idx_vec = self.get_mesh_vertex_indices();
 
         // compute vertices
-        let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
 
 
-        let mut in_vec: Vec<bool> = Vec::new();
-        for mesh in &self.world.elements {
-            if self.view.in_view(mesh){
-                in_vec.push(true);
-            }else {
-                in_vec.push(false);
+        let use_gpu_calculations =false;
+
+        if use_gpu_calculations{
+            let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
+            let mut in_vec: Vec<bool> = Vec::new();
+            for mesh in &self.world.elements {
+                if self.view.in_view(mesh){
+                    in_vec.push(true);
+                }else {
+                    in_vec.push(false);
+                }
             }
+    
+            // ignore in_view buffer for now
+    
+            //self.draw_wireframe(vertices, window, screen_width, screen_height, pixel_buffer);
+    
+            // return;
+    
+    
+            let color = 0xFF0000;
+            for (i,mesh) in self.world.elements.iter().enumerate() {
+    
+                if !in_vec[i] {
+                    continue;
+                }
+    
+                for face in mesh.faces() {
+    
+                    let mut p0 = vertices[ face.vertex_ids[0] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
+                    let mut p1 = vertices[ face.vertex_ids[1] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
+                    let mut p2 = vertices[ face.vertex_ids[2] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
+    
+                    // Renderer::point_clip_at_edge(&mut p0, &mut p1, screen_width, screen_height);
+                    // Renderer::point_clip_at_edge(&mut p1, &mut p2, screen_width, screen_height);
+                    // Renderer::point_clip_at_edge(&mut p2, &mut p0, screen_width, screen_height);
+    
+    
+    
+                    let line = Line::from_vec(p0, p1, color);
+                    line.draw(pixel_buffer, screen_width, screen_height);
+    
+                    let line = Line::from_vec(p1, p2, color);
+                    line.draw(pixel_buffer, screen_width, screen_height);
+    
+                    let line = Line::from_vec(p2, p0, color);
+                    line.draw(pixel_buffer, screen_width, screen_height);
+    
+                }
+    
+            }
+    
+            return;
         }
 
-        // ignore in_view buffer for now
-
-        self.draw_wireframe(vertices, screen_width, screen_height);
-
-        return;
-
-
-        let color = 0xFF0000;
-        for (i,mesh) in self.world.elements.iter().enumerate() {
-
-            if !in_vec[i] {
-                continue;
-            }
-
-            for face in mesh.faces() {
-
-                let p0 = vertices[ face.vertex_ids[0] as usize + self.world.idx_vec_running[i] ].xy();
-                let p1 = vertices[ face.vertex_ids[1] as usize + self.world.idx_vec_running[i] ].xy();
-                let p2 = vertices[ face.vertex_ids[2] as usize + self.world.idx_vec_running[i] ].xy();
-
-                let line = Line::from_vec(p0, p1, color);
-                line.draw(pixel_buffer, screen_width, screen_height);
-
-                let line = Line::from_vec(p1, p2, color);
-                line.draw(pixel_buffer, screen_width, screen_height);
-
-                let line = Line::from_vec(p2, p0, color);
-                line.draw(pixel_buffer, screen_width, screen_height);
-
-            }
-
-        }
-
-        return;
 
 
 //////////////////////
@@ -668,7 +790,9 @@ impl Renderer {
          */
 
         // draw wirefram instead of faces
-        //if use_wireframe {
+
+        // old cpu threading, so much simpler
+        if use_wireframe {
             let collected_data: Vec<Vec<Vec<Vector4<f32>>>> = 
             self.world.elements.par_chunks(fragment_size).map(
                 |chunk| {
@@ -694,7 +818,7 @@ impl Renderer {
 
 
             //return;
-        //}
+        }
 
 
 
@@ -711,33 +835,37 @@ impl Renderer {
          */
 
 
-        /*
-        // face rendering
-        let collected_data: Vec<Vec<Vec<Vector4<Vector2<f32>>>>> = 
-        self.world.elements.par_chunks(fragment_size).map(
-            |chunk| {
+        let render_faces = false;
 
-                let mut thread_data:  Vec<Vec<Vector4<Vector2<f32>>>> = Vec::new();
-                for mesh in chunk.iter() {
-                    thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
+        if(render_faces){
+            let collected_data: Vec<Vec<Vec<Vector4<Vector2<f32>>>>> = 
+            self.world.elements.par_chunks(fragment_size).map(
+                |chunk| {
+    
+                    let mut thread_data:  Vec<Vec<Vector4<Vector2<f32>>>> = Vec::new();
+                    for mesh in chunk.iter() {
+                        thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
+                    }
+                    thread_data
                 }
-                thread_data
-            }
-        ).collect();
-
-        let mut c: u32 = 0;
-
-        for i in collected_data.iter(){
-            for j in i.iter(){
-                for k in j.iter() {
-                    let triangle = Triangle::from_vec4_list(k, 0xFFFFFF * (c%2));
-                    triangle.draw(pixel_buffer, depth_buffer, screen_width, screen_height);
+            ).collect();
+    
+            let mut c: u32 = 0;
+    
+            for i in collected_data.iter(){
+                for j in i.iter(){
+                    for k in j.iter() {
+                        let triangle = Triangle::from_vec4_list(k, 0xFFFFFF * (c%2));
+                        triangle.draw(pixel_buffer, depth_buffer, screen_width, screen_height);
+                    }
                 }
+                c+=1;
             }
-            c+=1;
+            
         }
-        
-         */
+        // face rendering
+
+         
 
 
 
@@ -868,13 +996,8 @@ impl Renderer {
 
 
         let mut write_lock = self.buffers.transform_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
-
         write_lock.transform_matrix = self.calculate_transformation().into();
 
-
-
-
- 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
             self.render_information.queue.queue_family_index(),
@@ -883,7 +1006,7 @@ impl Renderer {
         .unwrap();
     
 
-        let work_group_counts = [256, 1, 1];
+        let work_group_counts = [512, 1, 1];
 
 
         let descriptor_set_allocator =
@@ -893,12 +1016,14 @@ impl Renderer {
         let descriptor_set_layouts = pipeline_layout.set_layouts();
     
   
-        
+
 
         let descriptor_set_layout_index = 0;
         let descriptor_set_layout = descriptor_set_layouts
             .get(descriptor_set_layout_index)
             .unwrap();
+
+
 
         let descriptor_set = PersistentDescriptorSet::new(
             &descriptor_set_allocator,
@@ -962,7 +1087,93 @@ impl Renderer {
     }
 
 
-    fn draw_wireframe(&self, vertices: Vec<Vector4<f32>>, screen_width: i64, screen_height: i64) {
+
+
+
+    fn draw_wireframe(&self, vertices: Vec<Vector4<f32>>, window: &mut Window, screen_width: i64, screen_height: i64, pixel_buffer: &mut Vec<u32>) {
+
+        let image = Image::new(
+            self.render_information.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::R8G8B8A8_UNORM,
+                extent: [self.screen_width as u32,self.screen_height as u32, 1],
+                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+
+        let image_view = ImageView::new_default(image.clone()).unwrap();
+
+        let image_size = self.screen_width * self.screen_height * 4; // RGBA, 4 bytes per pixel
+        let output_img_buf: Subbuffer<[u32]> = Buffer::new_slice(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC, // Can be read and transferred
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
+                ..Default::default()
+            },
+            image_size as u64, // Corrected buffer size
+        ).expect("Failed to create readback buffer!");
+
+        // Wrap in ImageView	Use ImageView::new_default(image)	Allows shaders to access RawImage
+        // Bind to Descriptor Set	Use WriteDescriptorSet::image_view()	Makes image available to the compute shader
+        // Use imageStore() in GLSL	Write pixels directly to image2D	Avoids slow buffer copies
+        // Copy to Swapchain	Use copy_image() after compute dispatch	Displays rendered pixels
+
+
+
+
+        let mut in_vec: Vec<u32> = Vec::new();
+        for mesh in &self.world.elements {
+            if self.view.in_view(mesh){
+                in_vec.push(1);
+            }else {
+                in_vec.push(0);
+            }
+        }
+
+
+        let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
+
+
+        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            in_vec.iter().cloned(),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
 
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
@@ -973,7 +1184,10 @@ impl Renderer {
         .unwrap();
     
 
-        let work_group_counts = [256, 1, 1];
+        let work_group_counts = [screen_width as u32, screen_height as u32,1];
+
+
+        
 
 
         let descriptor_set_allocator =
@@ -994,8 +1208,12 @@ impl Renderer {
             descriptor_set_layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
-                WriteDescriptorSet::buffer(2, self.buffers.transform_buffer.clone()),
-                //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
+                WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.pixel_buffer.clone()),
+                WriteDescriptorSet::buffer(3, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(4, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::image_view(5, image_view.clone()),
+
                 ], 
             [],
         )
@@ -1011,42 +1229,58 @@ impl Renderer {
             b: screen_height as f32,  
         };
        
+       let copy_operations = [
+        CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.pixel_staging_buffer.clone(), self.buffers.pixel_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.pixel_staging_buffer.clone(), self.buffers.pixel_buffer.clone()),
+        CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
+       ];
+
+       for copy_op in copy_operations{
+        command_buffer_builder.copy_buffer(copy_op).unwrap();
+       }
+
     
         command_buffer_builder
-            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_staging_buffer.clone(), self.buffers.vertex_buffer.clone()))
-            .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(self.buffers.transform_staging_buffers[((self.frame_count+1) %2) as usize].clone(), self.buffers.transform_buffer.clone()))
-            .unwrap()
-            .bind_pipeline_compute(self.render_information.vertex_compute_pipeline.clone())
-            .unwrap()
-            .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants).unwrap()
+            .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants)
+                .unwrap()
+            .bind_pipeline_compute(self.render_information.line_draw_compute_pipeline.clone())
+                .unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Compute,
-                self.render_information.vertex_compute_pipeline.layout().clone(),
+                self.render_information.line_draw_compute_pipeline.layout().clone(),
                 descriptor_set_layout_index as u32,
                 descriptor_set,
             )
-            .unwrap()
+                .unwrap()
             .dispatch(work_group_counts)
-            .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
+                .unwrap()
+            .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
+                image.clone(),
+                output_img_buf.clone(),
+            ))
             .unwrap();
-        
         let command_buffer = command_buffer_builder.build().unwrap();
     
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
-        .unwrap()
+            .unwrap()
         .then_signal_fence_and_flush()
-        .unwrap();
+            .unwrap();
+
     
-    future.wait(None).unwrap();  // Ensures GPU completion before reading
-    
-    let content = self.buffers.vertex_readback_buffer.read().unwrap();
+        future.wait(None).unwrap();  // Ensures GPU completion before reading
 
+        let start = std::time::Instant::now();
 
-    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
+        let content = output_img_buf.read().unwrap();
+        println!("Read time: {:?}", start.elapsed());
 
+        
+        let start = std::time::Instant::now();
+        window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
+        println!("Update time: {:?}", start.elapsed());
 
     }
 }

@@ -1,54 +1,14 @@
 use minifb::{Key, Window, WindowOptions};
 use std::f32::INFINITY;
-use std::time::{Duration, Instant};
-use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use std::env;
 
-use std::fs;
-
-use vulkano::VulkanLibrary;
-use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
-use vulkano::device::QueueFlags;
-
-use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
-
-use vulkano::memory::allocator::StandardMemoryAllocator;
-
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
-
-use vulkano::command_buffer::allocator::{
-    StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
-};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferInfo};
-
-use vulkano::sync::{self, GpuFuture};
-
-
-use vulkano::pipeline::Pipeline;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
-use vulkano::pipeline::PipelineBindPoint;
-
-use vulkano::pipeline::compute::ComputePipelineCreateInfo;
-use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
-use vulkano::pipeline::{ComputePipeline, PipelineLayout, PipelineShaderStageCreateInfo};
-
-use vulkano::shader::ShaderModule;
-use std::fs::File;
-use std::io::Read;
 
 
 use crate::world::World;
 use crate::view::View;
 use crate::renderer::Renderer;
-use crate::models::imported::Imported;
-
-use crate::primitives::triangle::Triangle;
-
-use crate::shaders::render_information::RenderInformation;
-
 
 pub mod shaders;
 pub mod mesh;
@@ -120,7 +80,7 @@ fn main() {
 
     let view = View::new(0.,0.,70.,0.,0.,0.,1.22, WIDTH, HEIGHT);
 
-    let world = World::new(HEIGHT as i64,WIDTH as i64,1000);
+    let world = World::new();
 
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
 
@@ -141,15 +101,14 @@ fn main() {
         panic!("{}", e);
     });
 
+    
+
 
 
 
     
 
     window.set_target_fps(100);
-
-
-    let mut x0 = 10.;
 
     // toggle with 'g'
     let mut use_wireframe: bool = true;
@@ -181,7 +140,6 @@ fn main() {
                 renderer.view.move_forward(-1.);
 
             }else if window.is_key_down(Key::A){
-                x0 += 4.;
                 renderer.view.move_side(-5.);
 
             }else if window.is_key_down(Key::S){
@@ -219,7 +177,7 @@ fn main() {
         // t.draw(&mut buffer, WIDTH as i64,HEIGHT as i64);
 
         
-        renderer.render(&mut pixel_buffer, &mut depth_buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
+        renderer.render(&mut pixel_buffer, &mut window, &mut depth_buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         window

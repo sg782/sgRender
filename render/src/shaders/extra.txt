@@ -1,0 +1,16 @@
+layout(set = 0, binding = 2) buffer VerticeCount{
+    uint data[];
+} vertice_count;
+
+
+
+layout(push_constant) uniform PushConstants {
+    float screen_width;
+    float screen_height;
+} push;
+layout(set = 0, binding = 1) buffer InView {
+    uint data[]; // 0 or 1, if in view
+} in_view;
+
+to disassemble
+ spirv-dis line_draw.spv

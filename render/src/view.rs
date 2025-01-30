@@ -116,7 +116,7 @@ impl View{
 
         self.rotation = x_rotation * y_rotation* z_rotation;
 
-        self.direction = (self.rotation * forward_vector);
+        self.direction = self.rotation * forward_vector;
 
         self.calculate_frustum_planes();
 
@@ -180,7 +180,6 @@ impl View{
         // if any are in every plane, then good
 
 
-        let mut idx = 0;
         for plane in &self.frustum_faces {
             //println!("Idx; {}", idx);
             let mut all_points_outside = true;
@@ -203,7 +202,7 @@ impl View{
                 }
             }
 
-            if(all_points_outside){
+            if all_points_outside {
                 //println!("Culled by {}", idx);
                 return false;
             }
