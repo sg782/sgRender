@@ -7,6 +7,8 @@ use nalgebra::Vector2;
 use rayon::prelude::*;
 use vulkano::image::ImageCreateInfo;
 use crate::mesh::mesh::Mesh;
+use vulkano::command_buffer::ClearColorImageInfo;
+use vulkano::format::ClearColorValue;
 
 use crate::primitives::line::Line;
 
@@ -323,6 +325,8 @@ impl Renderer {
             .map(|&v| [v[0] as u32, v[1] as u32, v[2] as u32, v[3] as u32]),
 
         ).expect("failed to cretae staging buffer");
+
+
 
         
         let face_buffer: Subbuffer<[[u32; 4]]> = Buffer::new_unsized(
@@ -703,14 +707,14 @@ impl Renderer {
         // 4. faces buffer, once applicable
         //  */
 
-        pixel_buffer.fill(0x87CEFA);
+        //pixel_buffer.fill(0x87CEFA);
          
         //let idx_vec = self.get_mesh_vertex_indices();
 
         // compute vertices
 
 
-        let use_gpu_calculations =false;
+        let use_gpu_calculations =true;
 
         if use_gpu_calculations{
             let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
@@ -725,9 +729,9 @@ impl Renderer {
     
             // ignore in_view buffer for now
     
-            //self.draw_wireframe(vertices, window, screen_width, screen_height, pixel_buffer);
+            self.draw_wireframe(vertices, window, screen_width, screen_height, pixel_buffer);
     
-            // return;
+            return;
     
     
             let color = 0xFF0000;
@@ -1098,7 +1102,7 @@ impl Renderer {
                 image_type: ImageType::Dim2d,
                 format: Format::R8G8B8A8_UNORM,
                 extent: [self.screen_width as u32,self.screen_height as u32, 1],
-                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC,
+                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
                 ..Default::default()
             },
             AllocationCreateInfo {
@@ -1119,7 +1123,7 @@ impl Renderer {
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST,
+                memory_type_filter: MemoryTypeFilter::HOST_RANDOM_ACCESS,
                 ..Default::default()
             },
             image_size as u64, // Corrected buffer size
@@ -1132,7 +1136,7 @@ impl Renderer {
 
 
 
-
+        // final calculation
         let mut in_vec: Vec<u32> = Vec::new();
         for mesh in &self.world.elements {
             if self.view.in_view(mesh){
@@ -1141,6 +1145,7 @@ impl Renderer {
                 in_vec.push(0);
             }
         }
+
 
 
         let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
@@ -1184,7 +1189,9 @@ impl Renderer {
         .unwrap();
     
 
-        let work_group_counts = [screen_width as u32, screen_height as u32,1];
+        
+
+        let work_group_counts = [1024,1,1];
 
 
         
@@ -1209,10 +1216,9 @@ impl Renderer {
             [
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
-                WriteDescriptorSet::buffer(2, self.buffers.pixel_buffer.clone()),
-                WriteDescriptorSet::buffer(3, in_view_buffer.clone()),
-                WriteDescriptorSet::buffer(4, self.buffers.vertex_buffer.clone()),
-                WriteDescriptorSet::image_view(5, image_view.clone()),
+                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::image_view(4, image_view.clone()),
 
                 ], 
             [],
@@ -1223,6 +1229,8 @@ impl Renderer {
         // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
         // .unwrap()
 
+        
+
 
         let push_constants = PushConstants {
             a: screen_width as f32,
@@ -1231,8 +1239,7 @@ impl Renderer {
        
        let copy_operations = [
         CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
-        CopyBufferInfo::buffers(self.buffers.pixel_staging_buffer.clone(), self.buffers.pixel_buffer.clone()),
-        CopyBufferInfo::buffers(self.buffers.pixel_staging_buffer.clone(), self.buffers.pixel_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
         CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
        ];
@@ -1253,6 +1260,11 @@ impl Renderer {
                 descriptor_set_layout_index as u32,
                 descriptor_set,
             )
+                .unwrap()
+            .clear_color_image(ClearColorImageInfo {
+                clear_value: ClearColorValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ..ClearColorImageInfo::image(image.clone())
+            })
                 .unwrap()
             .dispatch(work_group_counts)
                 .unwrap()
@@ -1275,12 +1287,8 @@ impl Renderer {
         let start = std::time::Instant::now();
 
         let content = output_img_buf.read().unwrap();
-        println!("Read time: {:?}", start.elapsed());
 
-        
-        let start = std::time::Instant::now();
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
-        println!("Update time: {:?}", start.elapsed());
 
     }
 }

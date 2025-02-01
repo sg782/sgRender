@@ -108,7 +108,7 @@ fn main() {
 
     
 
-    window.set_target_fps(100);
+    window.set_target_fps(1000);
 
     // toggle with 'g'
     let mut use_wireframe: bool = true;
@@ -180,9 +180,9 @@ fn main() {
         renderer.render(&mut pixel_buffer, &mut window, &mut depth_buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
-        window
-            .update_with_buffer(&pixel_buffer, WIDTH, HEIGHT)
-            .unwrap();
+        // window
+        //     .update_with_buffer(&pixel_buffer, WIDTH, HEIGHT)
+        //     .unwrap();
 
         println!("{} ms", now.elapsed().as_millis());
     }

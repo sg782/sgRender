@@ -51,6 +51,14 @@ impl World{
 
         elements.push(Box::new(cube));
 
+        let cube = Cube::new(-4.,-17.,3.,40., 0xFFFFFF);
+
+        elements.push(Box::new(cube));
+        
+        let cube = Cube::new(-4.,-17.,3.,40., 0xFFFFFF);
+
+        elements.push(Box::new(cube));
+
 
         
         let mut running_total = 0;
