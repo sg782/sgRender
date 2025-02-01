@@ -4,6 +4,8 @@ use std::fmt::Write;
 use crate::world::World;
 use crate::view::View;
 use nalgebra::Vector2;
+use nalgebra::Vector3;
+
 use rayon::prelude::*;
 use vulkano::image::ImageCreateInfo;
 use crate::mesh::mesh::Mesh;
@@ -64,6 +66,8 @@ use vulkano::image::{Image, ImageUsage, view::ImageView};
 use vulkano::format::Format;
 use vulkano::device::Queue;
 use vulkano::memory::allocator::{StandardMemoryAllocator, MemoryAllocator};
+
+use crate::plane::Plane;
 /*
 RIGHT HANDED COORDINATE SYSTEM:
 
@@ -76,10 +80,21 @@ RIGHT HANDED COORDINATE SYSTEM:
 #[repr(C)]
 #[derive(Default, Copy, Clone, Pod, Zeroable)]
 pub struct Transformation {
-    pub transform_matrix: [[f32; 4]; 4], // Must be an array, not `Matrix4`
+    pub transform_matrix: [[f32; 4]; 4],
 }
 
-#[repr(C)] // Ensures memory layout compatibility with Vulkan
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+pub struct BoundingPoint {
+    min: [f32 ; 3],
+    max: [f32 ; 3],
+}
+
+pub struct FrustumFaces {
+    faces: Vec<Plane>,
+}
+
+#[repr(C)] 
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
 struct PushConstants {
     a: f32,
@@ -105,12 +120,8 @@ pub struct Buffers {
     pub running_vertice_staging_buffer: Subbuffer<[u32]>,
     pub running_vertice_buffer: Subbuffer<[u32]>,
 
-    //in_view_buffer
-
-    //canvas
-    pub pixel_staging_buffer: Subbuffer<[u32]>,
-    pub pixel_buffer: Subbuffer<[u32]>,
-    pub pixel_readback_buffer: Subbuffer<[u32]>,
+    pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
+    pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
 
 }
 
@@ -343,54 +354,6 @@ impl Renderer {
         ).expect("Failed to create storage buffer!");
 
 
-
-        /*
-         pixel buffer
-        */
-
-
-
-        let pixel_arr = vec![0u32; screen_width * screen_height];
-
-        let buffer_size = (pixel_arr.len() * std::mem::size_of::<i32>()) as u64;
-
-
-        let pixel_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {usage: BufferUsage::TRANSFER_SRC, ..Default::default()},
-            AllocationCreateInfo {memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,..Default::default()},
-            pixel_arr.iter().cloned(),
-        ).expect("failed to cretae staging buffer");
-
-        
-        let pixel_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-        let pixel_readback_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
-                ..Default::default()
-            },
-            buffer_size, // Same size as vertex_buffer
-        ).expect("Failed to create readback buffer!");
-        
-
-
         let vertice_indices = &world.idx_vec_running;
 
         let running_vertice_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
@@ -425,6 +388,50 @@ impl Renderer {
 
 
 
+        let mut bounding_boxes: Vec<Vector2<Vector3<f32>>> = Vec::new();
+        for mesh in &world.elements {
+            bounding_boxes.push(*mesh.bounding_box());
+        }
+
+        let bounding_box_staging_buffer: Subbuffer<[BoundingPoint]> = Buffer::from_iter(
+            render_information.memory_allocator.clone(), 
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            }, 
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            }, 
+            bounding_boxes.iter().map(
+                |bb| BoundingPoint {
+                min: [bb[0][0], bb[0][1], bb[0][2]],
+                max: [bb[1][0], bb[1][1], bb[1][2]],
+                }
+            ),
+        ).expect("Failed to create buffer");
+
+        let bounding_box_buffer: Subbuffer<[BoundingPoint]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            std::mem::size_of::<BoundingPoint>() as u64 * bounding_boxes.len() as u64
+        ).expect("Failed to create storage buffer!");
+
+
+
+
+
+
+
+
+
         // buffer encapsulation struct
         let buffers = Buffers {
             vertex_staging_buffer,
@@ -439,9 +446,11 @@ impl Renderer {
             running_vertice_staging_buffer,
             running_vertice_buffer,
 
-            pixel_staging_buffer,
-            pixel_buffer,
-            pixel_readback_buffer,
+            bounding_box_staging_buffer,
+            bounding_box_buffer,
+
+
+
         };
 
 
@@ -694,6 +703,20 @@ impl Renderer {
         return full_transformation;
     }
 
+
+
+    // pub fn calculate_in_view(&self) -> Vec<u32> {
+
+    //     let faces = self.view.frustum_faces;
+
+
+    //     //in_view_buffer
+    //     let in_view_staging_buffer: Subbuffer<[u32]>;
+    //     let frustum_faces_staging_buffer: Subbuffer<Plane>;
+    //     let frustum_faces_buffer: Subbuffer<Plane>;
+
+
+    // }
 
     pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, window: &mut Window,depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
 
@@ -1191,7 +1214,7 @@ impl Renderer {
 
         
 
-        let work_group_counts = [1024,1,1];
+        let work_group_counts = [512,1,1];
 
 
         

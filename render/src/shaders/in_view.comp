@@ -1,0 +1,73 @@
+#version 460
+
+/*
+Line drawing shader
+
+Necessary informaiton
+ 1. boolean in_view buffer
+ 2. integer vertice_count_buffer
+ 3. faces buffer
+ 4. screen width/height
+ 5. output buffer (for screen)
+
+*/
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+
+layout(push_constant) uniform PushConstants {
+    float screen_width;
+    float screen_height;
+} push;
+
+
+
+layout(set = 0, binding = 0) buffer Faces {
+    // first 3 values are vertex indices (relative to mesh), 
+    // last value is the idx of the mesh
+    uvec4 ids[];
+} faces;
+
+
+layout(set = 0, binding = 1) buffer RunningVerticeCount{
+    uint data[];
+} running_vertice_count;
+
+layout(set = 0, binding = 2) buffer InView {
+    uint data[];
+} in_view;
+
+layout(set = 0, binding = 3) buffer VertexData {
+    vec4 data[];
+} vertex_data;
+
+layout(set = 0, binding = 4, rgba8) uniform writeonly image2D img;
+
+
+
+void main() {
+
+    uint idx = gl_GlobalInvocationID.x;
+    uint idy = gl_GlobalInvocationID.y;
+
+
+
+    uvec4 face = faces.ids[idx * 16 + idy]; // get face
+
+    if(in_view.data[face[3]]==0){ // return early if not in view
+        return;
+    }
+
+    // get the indices of each vertex, factoring in offset from how we store the data
+    uint v_0_idx = face[0] + running_vertice_count.data[face[3]];
+    uint v_1_idx = face[1] + running_vertice_count.data[face[3]];
+    uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
+
+
+    draw_line(v_0_idx,v_1_idx);
+    draw_line(v_1_idx,v_2_idx);
+    draw_line(v_2_idx,v_0_idx);
+
+}
+
+
