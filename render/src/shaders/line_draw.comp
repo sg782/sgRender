@@ -45,6 +45,83 @@ layout(set = 0, binding = 4, rgba8) uniform writeonly image2D img;
 
 
 
+void clip_lines(inout vec2 p0, inout vec2 p1){
+    float width = push.screen_width;
+    float height = push.screen_height;
+
+    if(p0[0] <=0. && p1[0] <=0.){
+        return;
+    }
+    if(p0[0] >=width-1. && p1[0]>= width-1.){
+        return;
+    }
+
+    if(p0[1] <=0. && p1[1] <= 0.){
+        return;
+    }
+    if(p0[1] >=height-1. && p1[1]>= height-1.){
+        return;
+    }
+
+
+    // x
+    if(p0[0] < 0.) {
+        float scaling = p1[0] / (p1[0]-p0[0]);
+
+
+        float dy = p1[1] - p0[1];
+
+        p0[0] = 0.;
+        p0[1] = p1[1] - (scaling * dy);
+    } else if (p0[0] >= width) {
+        float scaling = (width - p1[0]) / (p0[0] - p1[0]);
+        float dy = p1[1] - p0[1];
+        p0[0] = width-1.;
+        p0[1] = p1[1] - (scaling * dy);
+    }
+
+    if (p1[0] <0.) {
+        float scaling = p0[0] / (p0[0]-p1[0]);
+        float dy = p0[1] - p1[1];
+
+        p1[0] = 0.;
+        p1[1] = p0[1] - (scaling * dy);
+    }else if (p1[0] >= width) {
+        float scaling = (width - p0[0]) / (p1[0] - p0[0]);
+        float dy = p0[1] - p1[1];
+        p1[0] = width-1.;
+        p1[1] = p0[1] - (scaling * dy);
+    }
+
+
+    // y
+    if (p0[1] < 0.) {
+        float scaling = p1[1] / (p1[1]-p0[1]);
+        float dx = p1[0] - p0[0];
+
+        p0[1] = 0.;
+        p0[0] = p1[0] - (scaling * dx);
+    }else if (p0[1] >= height) {
+        float scaling = (height - p1[1]) / (p0[1] - p1[1]);
+        float dx = p1[0] - p0[0];
+        p0[1] = height-1.;
+        p0[0] = p1[0] - (scaling * dx);
+    }
+
+    if (p1[1] <0.) {
+        float scaling = p0[1] / (p0[1]-p1[1]);
+        float dx = p0[0] - p1[0];
+
+        p1[1] = 0.;
+        p1[0] = p0[0] - (scaling * dx);
+    } else if (p1[1] >= height) {
+        float scaling = (height - p0[1]) / (p1[1] - p0[1]);
+        float dx = p0[0] - p1[0];
+        p1[1] = height-1.;
+        p1[0] = p0[0] - (scaling * dx);
+    }
+
+}
 
 
 void draw_line(uint v_a_idx, uint v_b_idx) {
@@ -52,6 +129,8 @@ void draw_line(uint v_a_idx, uint v_b_idx) {
 
     vec4 start = vertex_data.data[v_a_idx];
     vec4 end = vertex_data.data[v_b_idx];
+
+    clip_lines(start.xy,end.xy);
 
     // use float for now, if precision is an issue for some reason, we will use double
     float dy = end[1] - start[1];
@@ -132,9 +211,27 @@ void main() {
     uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
 
 
-    draw_line(v_0_idx,v_1_idx);
-    draw_line(v_1_idx,v_2_idx);
-    draw_line(v_2_idx,v_0_idx);
+
+    // make sure it is far enough away
+    // protects against weird 'behind the camera' artifacts
+
+    // HARDCODED VALUE ALERT 
+    // i just dont want to define another push constant rn 
+    // 0.1 = self.view.near
+    bool in_0 = (vertex_data.data[v_0_idx][3] < - 0.1);
+    bool in_1 = (vertex_data.data[v_1_idx][3] < - 0.1);
+    bool in_2 = (vertex_data.data[v_2_idx][3] < - 0.1);
+    if(in_0 && in_1) {
+        draw_line(v_0_idx,v_1_idx);
+    }
+
+    if(in_1 && in_2) {
+        draw_line(v_1_idx,v_2_idx);
+    }
+
+    if(in_2 && in_0) {
+            draw_line(v_2_idx,v_0_idx);
+    }
 
 }
 

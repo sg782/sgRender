@@ -28,8 +28,8 @@ impl World{
 
         // // //test with a row of cubes
         let side_length = 5.9;
-        let amount_wide = 25;
-        let amount_high = 25;
+        let amount_wide = 5;
+        let amount_high = 5;
         let mut count: u32 = 0;
         for i in -amount_wide..amount_wide{
             for j in -amount_high..amount_high{
@@ -38,6 +38,7 @@ impl World{
                     let jdx = j as f32;
                     let cube = Cube::new(side_length * idx,side_length*jdx,-10.,side_length, 0xFFFFFF * (count %2));
                     elements.push(Box::new(cube));
+
             }
         }
 

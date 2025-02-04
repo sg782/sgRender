@@ -30,11 +30,8 @@ const HEIGHT: usize = 600;
 Things to add:
  - turn camera left/right/up/down (relative to view)
  - render faces (fill triangles)
-
+ - dynamically sized (at initialization) buffers for rendering
  - add render distance
-
-
- - dont render meshes behind camera (make a cubic outline at initialization and if cube is out of render then dont render mesh)
 
 
 */
