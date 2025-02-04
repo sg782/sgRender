@@ -87,11 +87,16 @@ pub struct Transformation {
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 pub struct BoundingPoint {
     min: [f32 ; 3],
+    _pad1: f32,
     max: [f32 ; 3],
+    _pad2: f32,
+
 }
 
+#[repr(C)] 
+#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
 pub struct FrustumFaces {
-    faces: Vec<Plane>,
+    faces: [[ f32; 4];6], // normal: Vec3<f32>, and Distance: f32
 }
 
 #[repr(C)] 
@@ -406,7 +411,9 @@ impl Renderer {
             bounding_boxes.iter().map(
                 |bb| BoundingPoint {
                 min: [bb[0][0], bb[0][1], bb[0][2]],
+                _pad1: 0.,
                 max: [bb[1][0], bb[1][1], bb[1][2]],
+                _pad2: 0.,
                 }
             ),
         ).expect("Failed to create buffer");
@@ -414,7 +421,7 @@ impl Renderer {
         let bounding_box_buffer: Subbuffer<[BoundingPoint]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
             AllocationCreateInfo {
@@ -723,7 +730,7 @@ impl Renderer {
         self.frame_count += 1;
 
         // // to render we need
-        // /*
+        // /
         // 1. vertex buffer (dynamic)
         // 2. connections buffer (static)
         // 3. transform buffer (dynamic)
@@ -742,15 +749,18 @@ impl Renderer {
         if use_gpu_calculations{
             let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
             let mut in_vec: Vec<bool> = Vec::new();
-            for mesh in &self.world.elements {
-                if self.view.in_view(mesh){
-                    in_vec.push(true);
-                }else {
-                    in_vec.push(false);
-                }
-            }
+            // for mesh in &self.world.elements {
+                
+            //     if self.view.in_view(mesh){
+            //         in_vec.push(true);
+            //     }else {
+            //         in_vec.push(false);
+            //     }
+            // }
     
             // ignore in_view buffer for now
+
+            //self.calculate_in_view();
     
             self.draw_wireframe(vertices, window, screen_width, screen_height, pixel_buffer);
     
@@ -1169,6 +1179,16 @@ impl Renderer {
             }
         }
 
+        // println!("-=-=-=-=-=-=-=-");
+        // println!("A: {:?}", in_vec);
+
+
+        let in_vec = self.calculate_in_view();
+
+
+        // println!("B: {:?}", in_veca);
+
+        //println!("inVec: {:?}", in_vec);
 
 
         let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
@@ -1314,5 +1334,159 @@ impl Renderer {
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
 
     }
+
+    fn calculate_in_view(&self) -> Vec<u32>{
+
+        let frustum_faces = &self.view.frustum_faces;
+
+        let frustum_faces_staging_buffer:Subbuffer<FrustumFaces> = Buffer::from_data(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            FrustumFaces {
+                faces: frustum_faces.iter().map(|face:&Plane| [face.normal[0], face.normal[1], face.normal[2], face.distance])
+                    .collect::<Vec<[f32; 4]>>()
+                    .try_into()
+                    .expect("Expected exactly 6 faces"),
+            },
+        ).expect("Failed to create uniform buffer");
+
+
+        let frustum_faces_buffer: Subbuffer<FrustumFaces> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            std::mem::size_of::<FrustumFaces>() as u64
+        ).expect("Failed to create storage buffer!");
+
+
+
+        
+        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            self.world.elements.len() as u64,
+        ).expect("Failed to create storage buffer!");
+
+        let in_view_readback_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            self.world.elements.len() as u64,
+        ).expect("Failed to create readback buffer!");
+
+
+
+    
+        
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            &self.render_information.command_buffer_allocator,
+            self.render_information.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+    
+        let work_group_counts = [512, 1, 1];
+
+        let descriptor_set_allocator =
+            StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
+    
+        let pipeline_layout = self.render_information.in_view_compute_pipeline.layout();
+        let descriptor_set_layouts = pipeline_layout.set_layouts();
+
+        let descriptor_set_layout_index = 0;
+        let descriptor_set_layout = descriptor_set_layouts
+            .get(descriptor_set_layout_index)
+            .unwrap();
+
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            descriptor_set_layout.clone(),
+            [
+                WriteDescriptorSet::buffer(0, self.buffers.bounding_box_buffer.clone()),
+                WriteDescriptorSet::buffer(1,frustum_faces_buffer.clone()),
+                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                ], 
+            [],
+        )
+        .unwrap();     
+
+
+     
+               
+        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+        // .unwrap()
+
+
+    
+        command_buffer_builder
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.bounding_box_staging_buffer.clone(), self.buffers.bounding_box_buffer.clone()))
+                .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(frustum_faces_staging_buffer.clone(), frustum_faces_buffer.clone()))
+                .unwrap()
+            .bind_pipeline_compute(self.render_information.in_view_compute_pipeline.clone())
+            .   unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                self.render_information.in_view_compute_pipeline.layout().clone(),
+                descriptor_set_layout_index as u32,
+                descriptor_set,
+            )
+                .unwrap()
+            .dispatch(work_group_counts)
+                .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(in_view_buffer.clone(), in_view_readback_buffer.clone()))
+                .unwrap();
+
+        let command_buffer = command_buffer_builder.build().unwrap();
+    
+        let future = sync::now(self.render_information.device.clone())
+        .then_execute(self.render_information.queue.clone(), command_buffer)
+        .unwrap()
+        .then_signal_fence_and_flush()
+        .unwrap();
+    
+    future.wait(None).unwrap();  // Ensures GPU completion before reading
+    
+    let content = in_view_readback_buffer.read().unwrap();
+
+
+    let mut out: Vec<u32> = Vec::new();
+
+    for val in content.iter() {
+        out.push(*val);
+    }
+
+    
+
+    out
+        
+    }
+
 }
 

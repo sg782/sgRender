@@ -19,8 +19,8 @@ mod world;
 mod view;
 mod renderer;
 
-const WIDTH: usize = 1200;
-const HEIGHT: usize = 1200;
+const WIDTH: usize = 600;
+const HEIGHT: usize = 600;
 
 
 
@@ -108,7 +108,7 @@ fn main() {
 
     
 
-    window.set_target_fps(1000);
+    window.set_target_fps(100);
 
     // toggle with 'g'
     let mut use_wireframe: bool = true;

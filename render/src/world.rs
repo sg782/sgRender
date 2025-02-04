@@ -26,7 +26,7 @@ impl World{
 
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
-        // //test with a row of cubes
+        // // //test with a row of cubes
         let side_length = 5.9;
         let amount_wide = 25;
         let amount_high = 25;
@@ -47,15 +47,15 @@ impl World{
         // elements.push(Box::new(teapot));
 
 
-        let cube = Cube::new(-5.,-20.,1.,100., 0xFFFFFF);
+        let cube = Cube::new(-100.,-20.,3.,40., 0xFFFFFF);
 
         elements.push(Box::new(cube));
 
-        let cube = Cube::new(-4.,-17.,3.,40., 0xFFFFFF);
+        let cube = Cube::new(-40.,-20.,3.,40., 0xFFFFFF);
 
         elements.push(Box::new(cube));
         
-        let cube = Cube::new(-4.,-17.,3.,40., 0xFFFFFF);
+        let cube = Cube::new(20.,-20.,3.,40., 0xFFFFFF);
 
         elements.push(Box::new(cube));
 

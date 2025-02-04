@@ -180,6 +180,7 @@ impl View{
         // if any are in every plane, then good
 
 
+
         for plane in &self.frustum_faces {
             //println!("Idx; {}", idx);
             let mut all_points_outside = true;

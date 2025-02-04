@@ -27,6 +27,7 @@ pub struct RenderInformation {
     pub memory_allocator: Arc<StandardMemoryAllocator>,
     pub vertex_compute_pipeline: Arc<ComputePipeline>,
     pub line_draw_compute_pipeline: Arc<ComputePipeline>,
+    pub in_view_compute_pipeline: Arc<ComputePipeline>,
    
 
 }
@@ -101,6 +102,31 @@ impl RenderInformation {
         )
         .expect("failed to create compute pipeline");
 
+
+        let in_view_shader = RenderInformation::load_shader(device.clone(), "src/shaders/in_view.spv");
+        let in_view_entry_point = in_view_shader.entry_point("main").unwrap();
+        let in_view_stage = PipelineShaderStageCreateInfo::new(in_view_entry_point);
+
+
+        
+
+        let in_view_layout = PipelineLayout::new(
+            device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&in_view_stage])
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap()
+        )
+        .unwrap();
+
+
+
+        let in_view_compute_pipeline = ComputePipeline::new(
+            device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(in_view_stage, in_view_layout),
+        )
+        .expect("failed to create compute pipeline");
+
         /*
             Transform Buffer
             */
@@ -114,6 +140,7 @@ impl RenderInformation {
             memory_allocator,
             vertex_compute_pipeline,
             line_draw_compute_pipeline,
+            in_view_compute_pipeline,
 
         }
     }
