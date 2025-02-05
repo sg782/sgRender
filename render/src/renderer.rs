@@ -1,5 +1,4 @@
 use std::f32::INFINITY;
-use std::fmt::Write;
 
 use crate::world::World;
 use crate::view::View;
@@ -14,11 +13,7 @@ use vulkano::format::ClearColorValue;
 
 use crate::primitives::line::Line;
 
-use vulkano::image::sys::RawImage;
 use crate::primitives::triangle::Triangle;
-use std::sync::Arc;
-
-use bytemuck::cast_slice;
 
 
 use nalgebra::Matrix4;
@@ -40,7 +35,6 @@ use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, Copy
 
 use vulkano::sync::{self, GpuFuture};
 
-use vulkano::descriptor_set::DescriptorSet;
 
 use vulkano::pipeline::Pipeline;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
@@ -59,13 +53,11 @@ use vulkano::command_buffer::CopyImageToBufferInfo;
 
 use vulkano::image::ImageType;
 
-use minifb::{Key, Window, WindowOptions};
+use minifb::Window;
 
 
 use vulkano::image::{Image, ImageUsage, view::ImageView};
 use vulkano::format::Format;
-use vulkano::device::Queue;
-use vulkano::memory::allocator::{StandardMemoryAllocator, MemoryAllocator};
 
 use crate::plane::Plane;
 /*
@@ -104,6 +96,14 @@ pub struct FrustumFaces {
 struct PushConstants {
     a: f32,
     b: f32,
+}
+
+#[repr(C)] 
+#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
+struct PushConstantsB {
+    a: f32,
+    b: f32,
+    c: f32,
 }
 
 pub struct Buffers { 
@@ -146,7 +146,6 @@ impl Renderer {
 // pass render information in
 
     pub fn new(world: World, view: View, screen_width: usize, screen_height: usize) -> Renderer{
-
 
 
         let library = VulkanLibrary::new().expect("no local Vulkan library/DLL");
@@ -342,8 +341,6 @@ impl Renderer {
 
         ).expect("failed to cretae staging buffer");
 
-
-
         
         let face_buffer: Subbuffer<[[u32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
@@ -390,9 +387,6 @@ impl Renderer {
         ).expect("Failed to create storage buffer!");
 
 
-
-
-
         let mut bounding_boxes: Vec<Vector2<Vector3<f32>>> = Vec::new();
         for mesh in &world.elements {
             bounding_boxes.push(*mesh.bounding_box());
@@ -431,14 +425,6 @@ impl Renderer {
             std::mem::size_of::<BoundingPoint>() as u64 * bounding_boxes.len() as u64
         ).expect("Failed to create storage buffer!");
 
-
-
-
-
-
-
-
-
         // buffer encapsulation struct
         let buffers = Buffers {
             vertex_staging_buffer,
@@ -464,12 +450,6 @@ impl Renderer {
 
         let frame_count = 0;
 
-
-
-
-
-
-
         Renderer{
             world,
             view,
@@ -481,171 +461,6 @@ impl Renderer {
         }
     }
 
-
-
-    pub fn clip_at_edge(x1: &mut f32, y1: &mut f32, x2: &mut f32, y2: &mut f32, screen_width: i64, screen_height: i64){
-
-        let width = screen_width as f32;
-        let height =screen_height as f32;
-
-        if(*x1 <=0. && *x2 <=0.){
-            return;
-        }
-        if(*x1 >=width-1. && *x2>= width-1.){
-            return;
-        }
-
-        if(*y1 <=0. && *y2 <= 0.){
-            return;
-        }
-        if(*y1 >=height-1. && *y2>= height-1.){
-            return;
-        }
-
-
-        // x
-        if *x1 < 0. {
-            let scaling = *x2 / (*x2-*x1);
-
-
-            let dy = *y2 - *y1;
-
-            *x1 = 0.;
-            *y1 = *y2 - (scaling * dy);
-        } else if *x1 >= width {
-            let scaling = (width - *x2) / (*x1 - *x2);
-            let dy = *y2 - * y1;
-            *x1 = width-1.;
-            *y1 = *y2 - (scaling * dy);
-        }
-
-        if *x2 <0. {
-            let scaling = *x1 / (*x1-*x2);
-            let dy = *y1 - *y2;
-
-            *x2 = 0.;
-            *y2 = *y1 - (scaling * dy);
-        }else if *x2 >= width {
-            let scaling = (width - *x1) / (*x2 - *x1);
-            let dy = *y1 - * y2;
-            *x2 = width-1.;
-            *y2 = *y1 - (scaling * dy);
-        }
-
-
-        // y
-        if *y1 < 0. {
-            let scaling = *y2 / (*y2-*y1);
-            let dx = *x2 - *x1;
-
-            *y1 = 0.;
-            *x1 = *x2 - (scaling * dx);
-        }else if *y1 >= height {
-            let scaling = (height - *y2) / (*y1 - *y2);
-            let dx = *x2 - * x1;
-            *y1 = height-1.;
-            *x1 = *x2 - (scaling * dx);
-        }
-
-        if *y2 <0. {
-            let scaling = *y1 / (*y1-*y2);
-            let dx = *x1 - *x2;
-
-            *y2 = 0.;
-            *x2 = *x1 - (scaling * dx);
-        } else if *y2 >= height {
-            let scaling = (height - *y1) / (*y2 - *y1);
-            let dx = *x1 - * x2;
-            *y2 = height-1.;
-            *x2 = *x1 - (scaling * dx);
-        }
-
-
-
-    }
-
-
-    // not correct rn
-    pub fn point_clip_at_edge(p0: &mut Vector2<f32>, p1: &mut Vector2<f32>, screen_width: i64, screen_height: i64){
-
-        let width = screen_width as f32;
-        let height =screen_height as f32;
-
-        if(p0[0] <=0. && p1[0] <=0.){
-            return;
-        }
-        if(p0[0] >=width-1. && p1[0]>= width-1.){
-            return;
-        }
-
-        if(p0[1] <=0. && p1[1] <= 0.){
-            return;
-        }
-        if(p0[1] >=height-1. && p1[1]>= height-1.){
-            return;
-        }
-
-
-        // x
-        if p0[0] < 0. {
-            let scaling = p1[0] / (p1[0]-p0[0]);
-
-
-            let dy = p1[1] - p0[1];
-
-            p0[0] = 0.;
-            p0[1] = p1[1] - (scaling * dy);
-        } else if p0[0] >= width {
-            let scaling = (width - p1[0]) / (p0[0] - p1[0]);
-            let dy = p1[1] -  p0[1];
-            p0[0] = width-1.;
-            p0[1] = p1[1] - (scaling * dy);
-        }
-
-        if p1[0] <0. {
-            let scaling = p0[0] / (p0[0]-p1[0]);
-            let dy = p0[1] - p1[1];
-
-            p1[0] = 0.;
-            p1[1] = p0[1] - (scaling * dy);
-        }else if p1[0] >= width {
-            let scaling = (width - p0[0]) / (p1[0] - p0[0]);
-            let dy = p0[1] -  p1[1];
-            p1[0] = width-1.;
-            p1[1] = p0[1] - (scaling * dy);
-        }
-
-
-        // y
-        if p0[1] < 0. {
-            let scaling = p1[1] / (p1[1]-p0[1]);
-            let dx = p1[0] - p0[0];
-
-            p0[1] = 0.;
-            p0[0] = p1[0] - (scaling * dx);
-        }else if p0[1] >= height {
-            let scaling = (height - p1[1]) / (p0[1] - p1[1]);
-            let dx = p1[0] -  p0[0];
-            p0[1] = height-1.;
-            p0[0] = p1[0] - (scaling * dx);
-        }
-
-        if p1[1] <0. {
-            let scaling = p0[1] / (p0[1]-p1[1]);
-            let dx = p0[0] - p1[0];
-
-            p1[1] = 0.;
-            p1[0] = p0[0] - (scaling * dx);
-        } else if p1[1] >= height {
-            let scaling = (height - p0[1]) / (p1[1] - p0[1]);
-            let dx = p0[0] -  p1[0];
-            p1[1] = height-1.;
-            p1[0] = p0[0] - (scaling * dx);
-        }
-
-
-
-    }
 
 
     pub fn calculate_transformation(&self) -> Matrix4<f32>{
@@ -711,151 +526,20 @@ impl Renderer {
     }
 
 
-
-    // pub fn calculate_in_view(&self) -> Vec<u32> {
-
-    //     let faces = self.view.frustum_faces;
-
-
-    //     //in_view_buffer
-    //     let in_view_staging_buffer: Subbuffer<[u32]>;
-    //     let frustum_faces_staging_buffer: Subbuffer<Plane>;
-    //     let frustum_faces_buffer: Subbuffer<Plane>;
-
-
-    // }
-
     pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, window: &mut Window,depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
 
         self.frame_count += 1;
 
-        // // to render we need
-        // /
-        // 1. vertex buffer (dynamic)
-        // 2. connections buffer (static)
-        // 3. transform buffer (dynamic)
-        // 4. faces buffer, once applicable
-        //  */
+        self.compute_vertex_screen_coordinates(screen_width, screen_height);
 
-        //pixel_buffer.fill(0x87CEFA);
-         
-        //let idx_vec = self.get_mesh_vertex_indices();
+        self.draw_wireframe(window, screen_width, screen_height);
 
-        // compute vertices
+        return;
 
 
-        let use_gpu_calculations =true;
-
-        if use_gpu_calculations{
-            let vertices = self.compute_vertex_screen_coordinates(screen_width, screen_height);
-            let mut in_vec: Vec<bool> = Vec::new();
-            // for mesh in &self.world.elements {
-                
-            //     if self.view.in_view(mesh){
-            //         in_vec.push(true);
-            //     }else {
-            //         in_vec.push(false);
-            //     }
-            // }
-    
-            // ignore in_view buffer for now
-
-            //self.calculate_in_view();
-    
-            self.draw_wireframe(vertices, window, screen_width, screen_height, pixel_buffer);
-    
-            return;
-    
-    
-            let color = 0xFF0000;
-            for (i,mesh) in self.world.elements.iter().enumerate() {
-    
-                if !in_vec[i] {
-                    continue;
-                }
-    
-                for face in mesh.faces() {
-    
-                    let mut p0 = vertices[ face.vertex_ids[0] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
-                    let mut p1 = vertices[ face.vertex_ids[1] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
-                    let mut p2 = vertices[ face.vertex_ids[2] as usize + (self.world.idx_vec_running[i] as usize) ].xy();
-    
-                    // Renderer::point_clip_at_edge(&mut p0, &mut p1, screen_width, screen_height);
-                    // Renderer::point_clip_at_edge(&mut p1, &mut p2, screen_width, screen_height);
-                    // Renderer::point_clip_at_edge(&mut p2, &mut p0, screen_width, screen_height);
-    
-    
-    
-                    let line = Line::from_vec(p0, p1, color);
-                    line.draw(pixel_buffer, screen_width, screen_height);
-    
-                    let line = Line::from_vec(p1, p2, color);
-                    line.draw(pixel_buffer, screen_width, screen_height);
-    
-                    let line = Line::from_vec(p2, p0, color);
-                    line.draw(pixel_buffer, screen_width, screen_height);
-    
-                }
-    
-            }
-    
-            return;
-        }
-
-
-
-//////////////////////
-
-
-        //pixel_buffer.fill(0x000000);
-
-        depth_buffer.fill(-INFINITY);
-
-        let full_transformation = self.calculate_transformation();
 
         let num_cores = num_cpus::get();
         let fragment_size = (&self.world.elements.len() / num_cores) + 1;
-
-        /*
-        multithreading
-
-        I tried to do it manually (bad idea)
-        using multithreading library 'rayon' now. it does not seem to help much
-        
-        Only 16 threads, i would like to delve into gpu threading maybe
-
-         */
-
-        // draw wirefram instead of faces
-
-        // old cpu threading, so much simpler
-        if use_wireframe {
-            let collected_data: Vec<Vec<Vec<Vector4<f32>>>> = 
-            self.world.elements.par_chunks(fragment_size).map(
-                |chunk| {
-    
-                    let mut thread_data: Vec<Vec<Vector4<f32>>> = Vec::new();
-                    for mesh in chunk.iter() {
-                        thread_data.push(self.calculate_mesh_wireframe(mesh, full_transformation, screen_width, screen_height));
-                    }
-                    thread_data
-                }
-            ).collect();
-
-            
-    
-            for i in collected_data.iter(){
-                for j in i.iter(){
-                    for k in j.iter() {
-                        let line = Line::new(k[0],k[1],k[2],k[3],1.,0xFF0000);
-                        line.draw(pixel_buffer, screen_width, screen_height);
-                    }
-                }
-            }
-
-
-            //return;
-        }
 
 
 
@@ -881,7 +565,7 @@ impl Renderer {
     
                     let mut thread_data:  Vec<Vec<Vector4<Vector2<f32>>>> = Vec::new();
                     for mesh in chunk.iter() {
-                        thread_data.push(self.calculate_mesh_faces(mesh, full_transformation, screen_width, screen_height));
+                        thread_data.push(self.calculate_mesh_faces(mesh, self.calculate_transformation(), screen_width, screen_height));
                     }
                     thread_data
                 }
@@ -911,61 +595,6 @@ impl Renderer {
 
     }
 
-
-    fn calculate_mesh_wireframe(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f32>, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>>{
-        let width = screen_width as f32;
-        let height = screen_height as f32;
-
-
-        let mut mesh_data: Vec<Vector4<f32>> = Vec::new();
-
-
-        // if not in view, dont render
-        if !self.view.in_view(mesh){
-            return mesh_data;
-        }
-        
-        let mut transformed_vertices: Vec<Vector4<f32>> = Vec::new();
-        let mut w_vals: Vec<f32> = Vec::new();
-        for point in mesh.vertices(){
-            let transformed_vertex = full_transformation * point.position;
-            w_vals.push(transformed_vertex[3]);
-            transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
-            
-        } 
-
-        // render each face
-        for face in mesh.faces(){
-
-            // rendering lines
-            for i in 0..3 {
-
-                let id_a = face.vertex_ids[i] as usize;
-                let id_b = face.vertex_ids[(i+1)%3] as usize;
-
-                if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
-                    continue;
-                }                
-
-                let a_position_prime = transformed_vertices[id_a];
-                let b_position_prime = transformed_vertices[id_b];
-
-                // scale back to device coordinates
-                // can remove some parameter passing by scaling AFTER clipping, idc rn
-                let mut x1_prime = width * (a_position_prime[0] +1.)/2.;
-                let mut y1_prime = height * (1.-a_position_prime[1])/2.;
-                let mut x2_prime = width * (b_position_prime[0] +1.)/2.;
-                let mut y2_prime = height * (1.-b_position_prime[1])/2.;
-
-                Renderer::clip_at_edge(&mut x1_prime,&mut y1_prime,&mut x2_prime,&mut y2_prime,screen_width,screen_height);
-                mesh_data.push(Vector4::new(x1_prime,y1_prime,x2_prime,y2_prime));
-            }
-
-            // render triangles
-        }
-
-        mesh_data
-    }
 
     fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f32>, screen_width: i64, screen_height: i64) ->  Vec<Vector4<Vector2<f32>>>{
         let width = screen_width as f32;
@@ -1118,16 +747,14 @@ impl Renderer {
     let content = self.buffers.vertex_readback_buffer.read().unwrap();
 
 
-    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
+    let mut out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
 
     out
     }
 
 
 
-
-
-    fn draw_wireframe(&self, vertices: Vec<Vector4<f32>>, window: &mut Window, screen_width: i64, screen_height: i64, pixel_buffer: &mut Vec<u32>) {
+    fn draw_wireframe(&self, window: &mut Window, screen_width: i64, screen_height: i64) {
 
         let image = Image::new(
             self.render_information.memory_allocator.clone(),
@@ -1168,21 +795,11 @@ impl Renderer {
         // Copy to Swapchain	Use copy_image() after compute dispatch	Displays rendered pixels
 
 
-
-        // final calculation
-        let mut in_vec: Vec<u32> = Vec::new();
-        for mesh in &self.world.elements {
-            if self.view.in_view(mesh){
-                in_vec.push(1);
-            }else {
-                in_vec.push(0);
-            }
-        }
-
         // println!("-=-=-=-=-=-=-=-");
         // println!("A: {:?}", in_vec);
 
 
+        
         let in_vec = self.calculate_in_view();
 
 
@@ -1273,11 +890,14 @@ impl Renderer {
         // .unwrap()
 
         
+        let dist_scale: f32 = self.view.near / self.view.dist_from_window; // check calculations 
 
 
-        let push_constants = PushConstants {
+
+        let push_constants = PushConstantsB {
             a: screen_width as f32,
             b: screen_height as f32,  
+            c: dist_scale as f32,
         };
        
        let copy_operations = [
@@ -1293,7 +913,7 @@ impl Renderer {
 
     
         command_buffer_builder
-            .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants)
+            .push_constants(self.render_information.line_draw_compute_pipeline.layout().clone(), 0, push_constants)
                 .unwrap()
             .bind_pipeline_compute(self.render_information.line_draw_compute_pipeline.clone())
                 .unwrap()
@@ -1329,9 +949,10 @@ impl Renderer {
 
         let start = std::time::Instant::now();
 
-        let content = output_img_buf.read().unwrap();
+        let mut content = output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
+
 
     }
 

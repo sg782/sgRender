@@ -17,6 +17,7 @@ pub struct View {
     pub direction: Vector4<f32>,
     pub rotation: Matrix4<f32>,
     pub frustum_faces: Vec<Plane>,
+    pub dist_from_window: f32,
 }
 
 impl View{
@@ -48,8 +49,10 @@ impl View{
 
         let frustum_faces: Vec<Plane> = Vec::new();
 
+        let dist_from_window = near;
+
         let mut view = View {
-            x, y, z, roll, pitch, yaw, fov, near, far, aspect_ratio, direction, rotation, frustum_faces
+            x, y, z, roll, pitch, yaw, fov, near, far, aspect_ratio, direction, rotation, frustum_faces, dist_from_window
         };
 
         view.calculate_frustum_planes();
@@ -161,8 +164,8 @@ impl View{
 
         let out:Vector3<f32> = Vector3::new(
             self.x + rotated_movement_vector[0],
-            self.y+rotated_movement_vector[1],
-            self.z+rotated_movement_vector[2],
+            self.y + rotated_movement_vector[1],
+            self.z + rotated_movement_vector[2],
         );
 
         return out;
@@ -212,6 +215,23 @@ impl View{
 
         true
 
+    }
+
+    pub fn translate_about_window(&mut self, val: f32){
+        // for now, we will just step forward and backward
+        //self.move_forward(val);
+
+
+        // theoretical distance from window
+        self.dist_from_window += val;
+        
+
+        // self.fov += val;
+        // self.move_forward(-val*0.2);
+
+        // let tan_val = (self.dist_from_window / (self.near * 100.)).tan();
+        // self.pitch = (tan_val);
+        //println!("near: {}", self.near);
     }
 
     pub fn calculate_frustum_planes (&mut self){

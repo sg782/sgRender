@@ -19,7 +19,7 @@ mod world;
 mod view;
 mod renderer;
 
-const WIDTH: usize = 600;
+const WIDTH: usize = 1200;
 const HEIGHT: usize = 600;
 
 
@@ -67,22 +67,11 @@ fn main() {
     env::set_var("RUST_BACKTRACE", "1");
 
 
-
-
-
-   
-
-
-
-
-    let view = View::new(0.,0.,70.,0.,0.,0.,1.22, WIDTH, HEIGHT);
+    let view = View::new(0.,0.,30.,0.,0.,0.,1., WIDTH, HEIGHT);
 
     let world = World::new();
 
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
-
-
-
 
 
     let mut pixel_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
@@ -114,6 +103,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {   
 
 
+        let movement_val = 2.;
 
         // random keys for testing
         // will clean up later
@@ -134,21 +124,21 @@ fn main() {
         }else{
             if window.is_key_down(Key::W){
                 // testing
-                renderer.view.move_forward(-1.);
+                renderer.view.move_forward(-movement_val);
 
             }else if window.is_key_down(Key::A){
-                renderer.view.move_side(-5.);
+                renderer.view.move_side(-movement_val);
 
             }else if window.is_key_down(Key::S){
-                renderer.view.move_forward(1.);
+                renderer.view.move_forward(movement_val);
             
             }else if window.is_key_down(Key::Q){
-                renderer.view.move_vertical(-5.)
+                renderer.view.move_vertical(-movement_val)
             }else if window.is_key_down(Key::E){
-                renderer.view.move_vertical(5.)
+                renderer.view.move_vertical(movement_val)
 
             }else if window.is_key_down(Key::D){
-                renderer.view.move_side(5.);
+                renderer.view.move_side(movement_val);
 
             }else if window.is_key_down(Key::X){
                 renderer.view.rotate_roll(rotation_val);
@@ -159,6 +149,10 @@ fn main() {
                 renderer.view.rotate_yaw(rotation_val);
             }else if window.is_key_down(Key::G){
                 use_wireframe = !use_wireframe;
+            }else if window.is_key_down(Key::N){
+                renderer.view.translate_about_window(-0.003);
+            }else if window.is_key_down(Key::M){
+                renderer.view.translate_about_window(0.003);
             }
         }
 

@@ -18,6 +18,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(push_constant) uniform PushConstants {
     float screen_width;
     float screen_height;
+    float dist_from_window_scalar;
 } push;
 
 
@@ -120,15 +121,18 @@ void clip_lines(inout vec2 p0, inout vec2 p1){
         p1[1] = height-1.;
         p1[0] = p0[0] - (scaling * dx);
     }
-
 }
 
 
 void draw_line(uint v_a_idx, uint v_b_idx) {
     // clip lines later
 
-    vec4 start = vertex_data.data[v_a_idx];
-    vec4 end = vertex_data.data[v_b_idx];
+
+    vec4 start;
+    vec4 end;
+
+    start = vertex_data.data[v_a_idx];
+    end = vertex_data.data[v_b_idx];
 
     clip_lines(start.xy,end.xy);
 
@@ -174,7 +178,7 @@ void draw_line(uint v_a_idx, uint v_b_idx) {
             int x = i + int(start[0]);
             int y = int(float(i) * (dy/dx) + start[1]);
 
-            
+                
             if(y<0 || y>=push.screen_height || x<0 || x>=push.screen_width) {
                 return;
             }
@@ -185,10 +189,6 @@ void draw_line(uint v_a_idx, uint v_b_idx) {
         }
 
     }
-
-
-
-
 }
 
 
@@ -197,7 +197,11 @@ void main() {
     uint idx = gl_GlobalInvocationID.x;
     uint idy = gl_GlobalInvocationID.y;
 
-
+    // yes i understand the following lines are redundant and inefficient, it is for testing
+    //draw_line(-1,0);
+    //draw_line(-2,0);
+    //draw_line(-3,0);
+    //draw_line(-4,0);
 
     uvec4 face = faces.ids[idx * 16 + idy]; // get face
 
@@ -234,5 +238,3 @@ void main() {
     }
 
 }
-
-

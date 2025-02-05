@@ -1,0 +1,11 @@
+
+/*
+to draw triangle:
+
+- depth buffer
+- face buffer
+- vertice buffer
+- current position (to calculate depth)
+- screen dimensions
+- color buffer
+*/
