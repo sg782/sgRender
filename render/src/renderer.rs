@@ -544,7 +544,7 @@ impl Renderer {
 
         self.compute_vertex_screen_coordinates(screen_width, screen_height);
 
-        self.draw_wireframe(window, screen_width, screen_height);
+        //self.draw_wireframe(window, screen_width, screen_height);
 
         self.draw_faces(window);
 
@@ -600,10 +600,6 @@ impl Renderer {
             
         }
         // face rendering
-
-         
-
-
 
         // draw faces (default behavior)
 
@@ -1287,9 +1283,6 @@ impl Renderer {
         // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
         // .unwrap()
 
-        
-
-        let dir = self.view.direction;
 
         let push_constants = PushConstantsC {
             screen_width: self.screen_width as f32,
@@ -1352,9 +1345,8 @@ impl Renderer {
     
         future.wait(None).unwrap();  // Ensures GPU completion before reading
 
-        let start = std::time::Instant::now();
 
-        let mut content = output_img_buf.read().unwrap();
+        let content = output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
 
