@@ -94,7 +94,7 @@ fn main() {
 
     
 
-    window.set_target_fps(100);
+    window.set_target_fps(300);
 
     // toggle with 'g'
     let mut use_wireframe: bool = true;

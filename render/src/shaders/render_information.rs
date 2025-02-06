@@ -28,8 +28,7 @@ pub struct RenderInformation {
     pub vertex_compute_pipeline: Arc<ComputePipeline>,
     pub line_draw_compute_pipeline: Arc<ComputePipeline>,
     pub in_view_compute_pipeline: Arc<ComputePipeline>,
-   
-
+    pub triangle_draw_compute_pipeline: Arc<ComputePipeline>,
 }
 
 impl RenderInformation {
@@ -119,7 +118,6 @@ impl RenderInformation {
         .unwrap();
 
 
-
         let in_view_compute_pipeline = ComputePipeline::new(
             device.clone(),
             None,
@@ -127,10 +125,28 @@ impl RenderInformation {
         )
         .expect("failed to create compute pipeline");
 
-        /*
-            Transform Buffer
-            */
 
+        let triangle_draw_shader = RenderInformation::load_shader(device.clone(), "src/shaders/triangle_draw.spv");
+        let triangle_draw_entry_point = triangle_draw_shader.entry_point("main").unwrap();
+        let triangle_draw_stage = PipelineShaderStageCreateInfo::new(triangle_draw_entry_point);
+
+
+        let triangle_draw_layout = PipelineLayout::new(
+            device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&triangle_draw_stage])
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap()
+        )
+        .unwrap();
+
+
+
+        let triangle_draw_compute_pipeline = ComputePipeline::new(
+            device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(triangle_draw_stage, triangle_draw_layout),
+        )
+        .expect("failed to create compute pipeline");
 
 
         Self {
@@ -141,7 +157,7 @@ impl RenderInformation {
             vertex_compute_pipeline,
             line_draw_compute_pipeline,
             in_view_compute_pipeline,
-
+            triangle_draw_compute_pipeline,
         }
     }
 

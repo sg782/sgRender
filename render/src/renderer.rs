@@ -106,6 +106,19 @@ struct PushConstantsB {
     c: f32,
 }
 
+#[repr(C)] 
+#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
+struct PushConstantsC {
+    screen_width: f32,
+    screen_height: f32,
+    roll: f32,
+    pitch: f32, 
+    yaw: f32,
+    x: f32, 
+    y: f32,
+    z: f32,
+}
+
 pub struct Buffers { 
 
     // vertices
@@ -127,7 +140,6 @@ pub struct Buffers {
 
     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
-
 }
 
 pub struct Renderer{
@@ -534,12 +546,15 @@ impl Renderer {
 
         self.draw_wireframe(window, screen_width, screen_height);
 
+        self.draw_faces(window);
+
         return;
 
 
 
         let num_cores = num_cpus::get();
         let fragment_size = (&self.world.elements.len() / num_cores) + 1;
+
 
 
 
@@ -753,7 +768,6 @@ impl Renderer {
     }
 
 
-
     fn draw_wireframe(&self, window: &mut Window, screen_width: i64, screen_height: i64) {
 
         let image = Image::new(
@@ -771,6 +785,7 @@ impl Renderer {
             },
         )
         .unwrap();
+
 
 
         let image_view = ImageView::new_default(image.clone()).unwrap();
@@ -1109,5 +1124,244 @@ impl Renderer {
         
     }
 
+    fn draw_faces(&self, window: &mut Window){
+
+        let pixel_image = Image::new(
+            self.render_information.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::R8G8B8A8_UNORM,
+                extent: [self.screen_width as u32,self.screen_height as u32, 1],
+                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        
+        let pixel_image_view = ImageView::new_default(pixel_image.clone()).unwrap();
+
+        let pixel_image_size = self.screen_width * self.screen_height * 4; // RGBA, 4 bytes per pixel
+        let output_img_buf: Subbuffer<[u32]> = Buffer::new_slice(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC, // Can be read and transferred
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_RANDOM_ACCESS,
+                ..Default::default()
+            },
+            pixel_image_size as u64, // Corrected buffer size
+        ).expect("Failed to create readback buffer!");
+
+
+        let in_vec = self.calculate_in_view();
+
+
+        // println!("B: {:?}", in_veca);
+
+        //println!("inVec: {:?}", in_vec);
+
+
+        let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
+
+
+        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            in_vec.iter().cloned(),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
+        let mut depth_vec: Vec<f32> = vec![-INFINITY; (self.screen_width * self.screen_height) as usize]; 
+        let buffer_size = (depth_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
+
+
+
+        let depth_staging_buffer: Subbuffer<[f32]> = Buffer::from_iter( 
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            depth_vec.iter().cloned(),
+
+        ).expect("failed to cretae depth buffer");
+
+        
+        let depth_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
+
+
+        // println!("B: {:?}", in_veca);
+
+        //println!("inVec: {:?}", in_vec);
+
+
+
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            &self.render_information.command_buffer_allocator,
+            self.render_information.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+    
+        let work_group_counts = [512,1,1];
+
+
+    
+
+        let descriptor_set_allocator =
+            StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
+    
+        let pipeline_layout = self.render_information.triangle_draw_compute_pipeline.layout();
+        let descriptor_set_layouts = pipeline_layout.set_layouts();
+
+  
+
+        let descriptor_set_layout_index = 0;
+        let descriptor_set_layout = descriptor_set_layouts
+            .get(descriptor_set_layout_index)
+            .unwrap();
+
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            descriptor_set_layout.clone(),
+            [
+                WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
+                WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
+                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(4, depth_buffer.clone()),
+                WriteDescriptorSet::image_view(5, pixel_image_view.clone()),
+                ], 
+            [],
+        )
+        .unwrap();
+
+               
+        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
+        // .unwrap()
+
+        
+
+        let dir = self.view.direction;
+
+        let push_constants = PushConstantsC {
+            screen_width: self.screen_width as f32,
+            screen_height: self.screen_height as f32,
+            roll: self.view.roll,
+            pitch: self.view.pitch,
+            yaw: self.view.yaw,
+            x: self.view.x,
+            y: self.view.y,
+            z: self.view.z,
+        };
+
+       
+       let copy_operations = [
+        CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
+        CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
+        CopyBufferInfo::buffers(depth_staging_buffer.clone(), depth_buffer.clone()),
+
+       ];
+
+       for copy_op in copy_operations{
+        command_buffer_builder.copy_buffer(copy_op).unwrap();
+       }
+
+    
+        command_buffer_builder
+            .bind_pipeline_compute(self.render_information.triangle_draw_compute_pipeline.clone())
+                .unwrap()
+            .push_constants(self.render_information.triangle_draw_compute_pipeline.layout().clone(), 0, push_constants)
+                .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                self.render_information.triangle_draw_compute_pipeline.layout().clone(),
+                descriptor_set_layout_index as u32,
+                descriptor_set,
+            )
+                .unwrap()
+            .clear_color_image(ClearColorImageInfo {
+                clear_value: ClearColorValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ..ClearColorImageInfo::image(pixel_image.clone())
+            })
+                .unwrap()
+            .dispatch(work_group_counts)
+                .unwrap()
+            .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
+                pixel_image.clone(),
+                output_img_buf.clone(),
+            ))
+            .unwrap();
+        let command_buffer = command_buffer_builder.build().unwrap();
+    
+        let future = sync::now(self.render_information.device.clone())
+        .then_execute(self.render_information.queue.clone(), command_buffer)
+            .unwrap()
+        .then_signal_fence_and_flush()
+            .unwrap();
+
+    
+        future.wait(None).unwrap();  // Ensures GPU completion before reading
+
+        let start = std::time::Instant::now();
+
+        let mut content = output_img_buf.read().unwrap();
+
+        window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
+
+
+
+
+
+    }
 }
 
