@@ -126,6 +126,8 @@ pub struct Buffers {
     pub vertex_buffer: Subbuffer<[[f32; 4]]>,
     pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
 
+    vertex_depth_buffer: Subbuffer<[f32]>,
+
     // rotation transform
     pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
     pub transform_buffer: Subbuffer<Transformation>,
@@ -133,6 +135,9 @@ pub struct Buffers {
     //faces_buffer
     pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
     pub face_buffer: Subbuffer<[[u32; 4]]>,
+
+    pub color_staging_buffer: Subbuffer<[u32]>,
+    pub color_buffer: Subbuffer<[u32]>,
 
     // running vertices
     pub running_vertice_staging_buffer: Subbuffer<[u32]>,
@@ -206,12 +211,11 @@ impl Renderer {
         // put all vertex data into one list, and decompose afterward
         for mesh in &world.elements {
             for vertice in mesh.vertices(){
-
-                raw_vertex_data.push(vertice.position.cast::<f32>());
+                raw_vertex_data.push(vertice.position);
             }
         }
     
-        let render_information = RenderInformation::new(device.clone(), queue.clone(), &raw_vertex_data);
+        let render_information = RenderInformation::new(device.clone(), queue.clone());
 
 
 
@@ -239,6 +243,19 @@ impl Renderer {
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+        let vertex_depth_buffer: Subbuffer<[f32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
             },
             AllocationCreateInfo {
@@ -335,7 +352,7 @@ impl Renderer {
             }
         }
 
-        let buffer_size = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
+        let buffer_size: u64 = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
 
         let face_staging_buffer: Subbuffer<[[u32; 4]]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
@@ -366,6 +383,46 @@ impl Renderer {
             },
             buffer_size
         ).expect("Failed to create storage buffer!");
+
+
+        let mut color_data: Vec<u32> = Vec::new();
+        for mesh in &world.elements{
+            color_data.push(mesh.color());
+        }
+
+        println!("{:?}", color_data);
+
+        let buffer_size: u64 = (color_data.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
+
+
+        let color_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            color_data
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let color_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
 
 
         let vertice_indices = &world.idx_vec_running;
@@ -442,12 +499,18 @@ impl Renderer {
             vertex_staging_buffer,
             vertex_buffer,
             vertex_readback_buffer,
+
+            vertex_depth_buffer,
+
             transform_buffer,
             transform_staging_buffers,
 
             face_staging_buffer,
             face_buffer,
 
+            color_staging_buffer,
+            color_buffer,
+            
             running_vertice_staging_buffer,
             running_vertice_buffer,
 
@@ -473,7 +536,10 @@ impl Renderer {
         }
     }
 
+    pub fn calculate_tiles_per_face(&self, ){
+        let ids: Vec<Vec<u32>> = Vec::new();
 
+    }
 
     pub fn calculate_transformation(&self) -> Matrix4<f32>{
 
@@ -538,138 +604,23 @@ impl Renderer {
     }
 
 
-    pub fn render(& mut self, pixel_buffer: &mut Vec<u32>, window: &mut Window,depth_buffer: &mut Vec<f32>, use_wireframe: bool, screen_width: i64, screen_height: i64){
+    pub fn render(& mut self, window: &mut Window){
 
         self.frame_count += 1;
 
-        self.compute_vertex_screen_coordinates(screen_width, screen_height);
+        let transformed_coords = self.compute_vertex_screen_coordinates();
+
+
+
+        
 
         //self.draw_wireframe(window, screen_width, screen_height);
 
         self.draw_faces(window);
 
-        return;
-
-
-
-        let num_cores = num_cpus::get();
-        let fragment_size = (&self.world.elements.len() / num_cores) + 1;
-
-
-
-
-        // draw faces
-        /*
-        How to efficiently get the depth of the triangle face at all points on the face?
-
-        // for now, we will just use a singular depth value, it should be good enough for simple things
-
-        1. get normal vector
-      
-        
-        
-         */
-
-
-        let render_faces = false;
-
-        if(render_faces){
-            let collected_data: Vec<Vec<Vec<Vector4<Vector2<f32>>>>> = 
-            self.world.elements.par_chunks(fragment_size).map(
-                |chunk| {
-    
-                    let mut thread_data:  Vec<Vec<Vector4<Vector2<f32>>>> = Vec::new();
-                    for mesh in chunk.iter() {
-                        thread_data.push(self.calculate_mesh_faces(mesh, self.calculate_transformation(), screen_width, screen_height));
-                    }
-                    thread_data
-                }
-            ).collect();
-    
-            let mut c: u32 = 0;
-    
-            for i in collected_data.iter(){
-                for j in i.iter(){
-                    for k in j.iter() {
-                        let triangle = Triangle::from_vec4_list(k, 0xFFFFFF * (c%2));
-                        triangle.draw(pixel_buffer, depth_buffer, screen_width, screen_height);
-                    }
-                }
-                c+=1;
-            }
-            
-        }
-        // face rendering
-
-        // draw faces (default behavior)
-
-
     }
 
-
-    fn calculate_mesh_faces(&self, mesh: &Box<dyn Mesh>, full_transformation: Matrix4<f32>, screen_width: i64, screen_height: i64) ->  Vec<Vector4<Vector2<f32>>>{
-        let width = screen_width as f32;
-        let height = screen_height as f32;
-
-
-        let mut mesh_data: Vec<Vector4<Vector2<f32>>> = Vec::new();
-
-
-        // if not in view, dont render
-        if !self.view.in_view(mesh){
-            return mesh_data;
-        }
-        
-        let mut transformed_vertices: Vec<Vector4<f32>> = Vec::new();
-        let mut w_vals: Vec<f32> = Vec::new();
-        for point in mesh.vertices(){
-            let transformed_vertex = full_transformation * point.position;
-            w_vals.push(transformed_vertex[3]);
-            transformed_vertices.push(transformed_vertex / transformed_vertex[3]);
-            
-        } 
-
-        // render each face
-        for face in mesh.faces(){
-
-            // the 4th vector2 represents depth, as a centroid
-            let mut face_data: Vector4<Vector2<f32>> = Vector4::new(
-                Vector2::new(0.,0.,),
-                Vector2::new(0.,0.,),
-                Vector2::new(0.,0.,),
-                Vector2::new(0.,0.),
-            );
-            // rendering lines
-            for i in 0..3 {
-
-                let id_a = face.vertex_ids[i] as usize;
-
-                // if w_vals[id_a] > -self.view.near || w_vals[id_b] > -self.view.near {
-                //     continue;
-                // }
-
-                let a_position_prime = transformed_vertices[id_a];
-
-                // scale back to device coordinates
-                // can remove some parameter passing by scaling AFTER clipping, idc rn
-                let x1_prime = width * (a_position_prime[0] +1.)/2.;
-                let y1_prime = height * (1.-a_position_prime[1])/2.;
-
-                face_data[i] =Vector2::new(x1_prime,y1_prime);
-
-                face_data[3][0] += w_vals[id_a];
-            }
-            face_data[3][0] /= 3.;
-
-            mesh_data.push(face_data);
-
-            // render triangles
-        }
-
-        mesh_data
-    }
-
-    fn compute_vertex_screen_coordinates (&self, screen_width: i64, screen_height: i64) -> Vec<Vector4<f32>> {
+    fn compute_vertex_screen_coordinates (&self) -> Vec<Vector4<f32>> {
 
 
         let mut write_lock = self.buffers.transform_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
@@ -707,7 +658,8 @@ impl Renderer {
             descriptor_set_layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, self.buffers.vertex_buffer.clone()),
-                WriteDescriptorSet::buffer(1, self.buffers.transform_buffer.clone()),
+                WriteDescriptorSet::buffer(1, self.buffers.vertex_depth_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.transform_buffer.clone()),
                 //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
                 ], 
             [],
@@ -720,18 +672,18 @@ impl Renderer {
 
 
         let push_constants = PushConstants {
-            a: screen_width as f32,
-            b: screen_height as f32,  
+            a: self.screen_width as f32,
+            b: self.screen_height as f32,  
         };
        
     
         command_buffer_builder
             .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_staging_buffer.clone(), self.buffers.vertex_buffer.clone()))
-            .unwrap()
+                .unwrap()
             .copy_buffer(CopyBufferInfo::buffers(self.buffers.transform_staging_buffers[((self.frame_count+1) %2) as usize].clone(), self.buffers.transform_buffer.clone()))
-            .unwrap()
+                .unwrap()
             .bind_pipeline_compute(self.render_information.vertex_compute_pipeline.clone())
-            .unwrap()
+                .unwrap()
             .push_constants(self.render_information.vertex_compute_pipeline.layout().clone(), 0, push_constants).unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Compute,
@@ -758,13 +710,13 @@ impl Renderer {
     let content = self.buffers.vertex_readback_buffer.read().unwrap();
 
 
-    let mut out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
+    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
 
     out
     }
 
 
-    fn draw_wireframe(&self, window: &mut Window, screen_width: i64, screen_height: i64) {
+    fn draw_wireframe(&self, window: &mut Window) {
 
         let image = Image::new(
             self.render_information.memory_allocator.clone(),
@@ -906,8 +858,8 @@ impl Renderer {
 
 
         let push_constants = PushConstantsB {
-            a: screen_width as f32,
-            b: screen_height as f32,  
+            a: self.screen_width as f32,
+            b: self.screen_height as f32,  
             c: dist_scale as f32,
         };
        
@@ -958,9 +910,8 @@ impl Renderer {
     
         future.wait(None).unwrap();  // Ensures GPU completion before reading
 
-        let start = std::time::Instant::now();
 
-        let mut content = output_img_buf.read().unwrap();
+        let content = output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
 
@@ -1273,7 +1224,8 @@ impl Renderer {
                 WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
                 WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(4, depth_buffer.clone()),
-                WriteDescriptorSet::image_view(5, pixel_image_view.clone()),
+                WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
+                WriteDescriptorSet::image_view(6, pixel_image_view.clone()),
                 ], 
             [],
         )
@@ -1301,8 +1253,8 @@ impl Renderer {
         CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
         CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.color_staging_buffer.clone(), self.buffers.color_buffer.clone()),
         CopyBufferInfo::buffers(depth_staging_buffer.clone(), depth_buffer.clone()),
-
        ];
 
        for copy_op in copy_operations{

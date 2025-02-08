@@ -1,8 +1,5 @@
 
-use std::cmp::min;
-use std::cmp::max;
 use std::f32::INFINITY;
-use std::prelude::v1;
 
 use nalgebra::Vector4;
 use nalgebra::Vector3;
@@ -133,7 +130,7 @@ impl Triangle {
 
 
 
-    pub fn draw(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, screen_width: i64, screen_height: i64){
+    pub fn draw(&self, pixel_buffer: &mut Vec<u32>, screen_width: i64, screen_height: i64){
 
 
         /*
@@ -146,24 +143,24 @@ impl Triangle {
         // can proceed with alg
 
         if self.v2[1] == self.v3[1] {
-            self.draw_flat_bottom_triangle(pixel_buffer, depth_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
+            self.draw_flat_bottom_triangle(pixel_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
         }else if self.v1[1] == self.v2[1] {
-            self.draw_flat_top_triangle(pixel_buffer, depth_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
+            self.draw_flat_top_triangle(pixel_buffer, self.v1, self.v2, self.v3, screen_width, screen_height);
         }else{
 
             // calculating intersection point for both triangles
             let v4_x = self.v1[0] + ((self.v2[1] - self.v1[1]) / (self.v3[1] - self.v1[1])) * (self.v3[0] - self.v1[0]);
             let v4: Vector2<f32> = Vector2::new(v4_x,self.v2[1]);
 
-            self.draw_flat_bottom_triangle(pixel_buffer, depth_buffer,self.v1, self.v2, v4, screen_width, screen_height); 
-            self.draw_flat_top_triangle(pixel_buffer, depth_buffer,self.v2, v4, self.v3, screen_width, screen_height);
+            self.draw_flat_bottom_triangle(pixel_buffer,self.v1, self.v2, v4, screen_width, screen_height); 
+            self.draw_flat_top_triangle(pixel_buffer,self.v2, v4, self.v3, screen_width, screen_height);
 
         }
 
 
     }
 
-    pub fn draw_flat_bottom_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: & mut Vec<f32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_bottom_triangle(&self, pixel_buffer: &mut Vec<u32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v2[0] - v1[0]) / (v2[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v1[0]) / (v3[1]- v1[1]);
 
@@ -201,7 +198,7 @@ impl Triangle {
         }
     }
 
-    pub fn draw_flat_top_triangle(&self, pixel_buffer: &mut Vec<u32>, depth_buffer: &mut Vec<f32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
+    pub fn draw_flat_top_triangle(&self, pixel_buffer: &mut Vec<u32>, v1: Vector2<f32>, v2: Vector2<f32>, v3: Vector2<f32>, screen_width: i64, screen_height: i64){
         let inv_slope_1 = (v3[0] - v1[0]) / (v3[1] - v1[1]);
         let inv_slope_2 = (v3[0] - v2[0]) / (v3[1]- v2[1]);
 

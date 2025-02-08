@@ -46,37 +46,16 @@ layout(set = 0, binding = 4) buffer DepthBuffer {
     float data[];
 } depth_buffer;
 
-layout(set = 0, binding = 5, rgba8) uniform writeonly image2D img;
+layout(set = 0, binding = 5) buffer ColorBuffer {
+    uint data[];
+} color_buffer;
+
+
+
+layout(set = 0, binding = 6, rgba8) uniform writeonly image2D img;
 
 // add in color buffer
 
-
-
-
-void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2){
-    float inv_slope_1 = (v1[0] - v0[0]) / (v1[1] - v0[1]);
-    float inv_slope_2 = (v2[0] - v0[0]) / (v2[1]- v0[1]);
-
-    float cur_x_1 = v0[0];
-    float cur_x_2 = v0[0];
-
-    for(int i=int(v0[1]);i<int(v1[1]);i++){
-        for(int j = int(min(cur_x_1,cur_x_2)); j<int(max(cur_x_1,cur_x_2));j++){
-
-            if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
-                return;
-            }
-
-            vec4 to_write = vec4(vec3(0.0,0.0,1.0), 1.0);
-            imageStore(img, ivec2(j,i), to_write);   
-
-        }
-
-        cur_x_1 += inv_slope_1;
-        cur_x_2 += inv_slope_2;
-
-    }
-}
 
 void sort_vertices(in vec4 v[3], out vec4 v_out[3]){
 
@@ -115,34 +94,106 @@ void sort_vertices(in vec4 v[3], out vec4 v_out[3]){
     v_out[2] = v[v2_idx];
 }
 
+void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
+    float inv_slope_1 = (v1[0] - v0[0]) / (v1[1] - v0[1]);
+    float inv_slope_2 = (v2[0] - v0[0]) / (v2[1]- v0[1]);
 
-void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2){
+    float cur_x_1 = v0[0];
+    float cur_x_2 = v0[0];
+
+
+    for(float i=v0[1];i<v1[1];i++){
+        for(float j = min(cur_x_1,cur_x_2); j< max(cur_x_1,cur_x_2);j++){
+
+            if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
+                return;
+            }
+
+            
+            uint int_i = int(i+0.5);
+            uint int_j = int(j+0.5);
+
+            // if currently blocked
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > v0[3]){
+                continue;
+            }else{
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = v0[3];
+            }
+
+            uint c = color_buffer.data[face_id];
+            vec4 color = uvec4(
+                mod(c,256),
+                mod(c/256,256),
+                mod(c/(256*256),256),
+                0);
+            vec4 to_write = color / 255;
+
+            ivec2 coord = ivec2(int(j+0.5),int(i+0.5));
+            imageStore(img, coord, to_write);     
+
+        }
+
+        cur_x_1 += inv_slope_1;
+        cur_x_2 += inv_slope_2;
+
+    }
+}
+
+
+void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
     float inv_slope_1 = (v2[0] - v0[0]) / (v2[1] - v0[1]);
     float inv_slope_2 = (v2[0] - v1[0]) / (v2[1]- v1[1]);
 
     float cur_x_1 = v2[0];
     float cur_x_2 = v2[0];
 
-    for(int i = int(v2[1]); i>int(v0[1]); i--){
-        for(int j = int(min(cur_x_1,cur_x_2)); j<int(max(cur_x_1,cur_x_2));j++){
+
+
+    
+
+    for(float i = v2[1]; i>v0[1]; i--){
+        for(float j = min(cur_x_1,cur_x_2); j<max(cur_x_1,cur_x_2);j++){
+
             if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
                 return;
             }
 
-            vec4 to_write = vec4(vec3(0.0,0.0,1.0), 1.0);
-            imageStore(img, ivec2(j,i), to_write);   
+
+            uint int_i = int(i+0.5);
+            uint int_j = int(j+0.5);
+
+            // if currently blocked
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > v0[3]){
+                continue;
+            }else{
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = v0[3];
+            }
+
+
+            uint c = color_buffer.data[face_id];
+            vec4 color = uvec4(
+                mod(c,256),
+                mod(c/256,256),
+                mod(c/(256*256),256),
+                0);
+            vec4 to_write = color / 255;
+
+
+
+            ivec2 coord = ivec2(int(j+0.5),int(i+0.5));
+            imageStore(img, coord, to_write);     
 
         }
 
-            cur_x_1 -= inv_slope_1;
-            cur_x_2 -= inv_slope_2;
+        cur_x_1 -= inv_slope_1;
+        cur_x_2 -= inv_slope_2;
     }
 
 
 }
 
 
-void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx){
+void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id){
     vec4 va = vertex_data.data[v_a_idx];
     vec4 vb = vertex_data.data[v_b_idx];
     vec4 vc = vertex_data.data[v_c_idx];
@@ -163,27 +214,27 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx){
 
 
     if (v1[1] == v2[1]) {
-        draw_flat_bottom_triangle(v0, v1, v2);
+        draw_flat_bottom_triangle(v0, v1, v2, face_id);
     }else if(v0[1] == v1[1]) {
-        draw_flat_top_triangle(v0, v1, v2);
+        draw_flat_top_triangle(v0, v1, v2, face_id);
     }else{
 
         // calculating intersection point for both triangles
         float v3_x = v0[0] + ((v1[1] - v0[1]) / (v2[1] - v0[1])) * (v2[0] - v0[0]);
         vec4 v3 = vec4(v3_x,v1[1],0,0);
 
-        draw_flat_bottom_triangle(v0,v1,v2); 
-        draw_flat_top_triangle(v1, v3, v2);
+        draw_flat_bottom_triangle(v0,v1,v2, face_id); 
+        draw_flat_top_triangle(v1, v3, v2, face_id);
     }
 }
 
 
 void main() {
-    uvec4 id = faces.ids[0];
     uint i = running_vertice_count.data[0] + int(push.screen_width+push.screen_height) ;
     uint j = in_view.data[0];
     vec4 k = vertex_data.data[0];
     float d = depth_buffer.data[0];
+    uint g = color_buffer.data[0];
 
    // float t = push.current_heading[0];
     //float q = push.current_position[0];
@@ -204,7 +255,7 @@ void main() {
     uint v_1_idx = face[1] + running_vertice_count.data[face[3]];
     uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
 
-    draw_triangle(v_0_idx,v_1_idx,v_2_idx);
+    draw_triangle(v_0_idx,v_1_idx,v_2_idx,face[3]);
 
 }
 

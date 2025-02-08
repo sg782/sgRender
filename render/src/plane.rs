@@ -30,10 +30,10 @@ impl Plane {
         }
     }
 
-    pub fn is_inside(&self, p: Vector3<f32> ) -> bool{
+    // pub fn is_inside(&self, p: Vector3<f32> ) -> bool{
 
-        self.normal.dot(&p) - self.distance <=0.0
-    }
+    //     self.normal.dot(&p) - self.distance <=0.0
+    // }
 
 
 }

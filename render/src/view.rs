@@ -1,7 +1,6 @@
 use nalgebra::Matrix4;
 use nalgebra::{Vector3,Vector4};
 use crate::plane::Plane;
-use crate::mesh::mesh::Mesh;
 
 pub struct View {
     pub x: f32,
@@ -174,48 +173,6 @@ impl View{
     // pub fn print_fov(&mut self){
         
     // }
-
-    pub fn in_view(&self, mesh: &Box<dyn Mesh>) -> bool{
-
-        let bounding_box = mesh.bounding_box();
-
-
-        // if any are in every plane, then good
-
-
-
-        for plane in &self.frustum_faces {
-            //println!("Idx; {}", idx);
-            let mut all_points_outside = true;
-
-
-            // iterate nicely over
-            
-
-            for i in 0..8{
-                let cur_point: Vector3<f32> = Vector3::new(
-                    if i & 1 == 0 {bounding_box[0][0]} else {bounding_box[1][0]},
-                    if i & 2 == 0 {bounding_box[0][1]} else {bounding_box[1][1]},
-                    if i & 4 == 0 {bounding_box[0][2]} else {bounding_box[1][2]},
-                );
-
-
-                if plane.is_inside(cur_point){
-                   all_points_outside = false;
-                    break;
-                }
-            }
-
-            if all_points_outside {
-                //println!("Culled by {}", idx);
-                return false;
-            }
-
-        }
-
-        true
-
-    }
 
     pub fn translate_about_window(&mut self, val: f32){
         // for now, we will just step forward and backward

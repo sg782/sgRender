@@ -1,10 +1,7 @@
 use minifb::{Key, Window, WindowOptions};
-use std::f32::INFINITY;
 use std::time::Instant;
 
 use std::env;
-
-
 
 use crate::world::World;
 use crate::view::View;
@@ -66,16 +63,10 @@ fn main() {
 
     env::set_var("RUST_BACKTRACE", "1");
 
-
     let view = View::new(0.,0.,30.,0.,0.,0.,1., WIDTH, HEIGHT);
-
     let world = World::new();
-
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
 
-
-    let mut pixel_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-    let mut depth_buffer: Vec<f32> = vec![-INFINITY; WIDTH * HEIGHT]; 
 
     let mut window = Window::new(
         "Test - ESC to exit",
@@ -88,9 +79,6 @@ fn main() {
     });
 
     
-
-
-
 
     
 
@@ -168,7 +156,7 @@ fn main() {
         // t.draw(&mut buffer, WIDTH as i64,HEIGHT as i64);
 
         
-        renderer.render(&mut pixel_buffer, &mut window, &mut depth_buffer, use_wireframe, WIDTH as i64,HEIGHT as i64);
+        renderer.render(&mut window);
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         // window

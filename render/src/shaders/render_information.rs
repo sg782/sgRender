@@ -12,8 +12,6 @@ use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
 use vulkano::pipeline::compute::ComputePipelineCreateInfo;
 
 
-use nalgebra::Vector4;
-
 
 
 
@@ -48,7 +46,7 @@ impl RenderInformation {
     }
 
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, raw_vertex_data: &Vec<Vector4<f32>>) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
 
         // Memory Allocator (Reuse across frames)
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));

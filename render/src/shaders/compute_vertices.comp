@@ -14,12 +14,18 @@ layout(set = 0, binding = 0) buffer Data {
     vec4 data[];
 } buf;
 
-layout(set = 0, binding = 1) uniform Transform {
+layout(set = 0, binding = 1) buffer VertexDepth {
+    float data[];
+} depth_buf;
+
+layout(set = 0, binding = 2) uniform Transform {
     mat4 transformMatrix;
 } transform;
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
+    depth_buf.data[idx] = 1.;
+
     buf.data[idx] = transform.transformMatrix * buf.data[idx];
 
     if(buf.data[idx][3] != 0){

@@ -13,8 +13,6 @@ impl Face {
     }
 
     pub fn new_from_vec(vertices: Vec<i64>) -> Face {
-
-        // i need to allow for differente side-amount polygons
         assert_eq!(vertices.len(),3);
 
         Face {
@@ -22,8 +20,4 @@ impl Face {
         }
     }
 
-    pub fn get_depth_plane(v1: Vector3<f32>, v2: Vector3<f32>, v3: Vector3<f32>){
-        // define a plane
-        // be able to translate along plane
-    }
 }

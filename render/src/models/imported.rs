@@ -1,5 +1,5 @@
 use crate::mesh::face::Face;
-use crate::mesh::point::{self, Point};
+use crate::mesh::point::Point;
 use crate::mesh::mesh::Mesh;
 
 use std::f32::INFINITY;
@@ -7,9 +7,6 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use nalgebra::{Vector2,Vector3};
-
-use std::cmp::min;
-use std::cmp::max;
 
 
 // https://paulbourke.net/dataformats/obj/
@@ -38,7 +35,7 @@ impl Mesh for Imported {
 
     fn color(&self) -> u32 {
         // default color for now
-        0xFFFFFF
+        0xFF00FF
     }
     fn num_vertices(&self) -> usize {
         self.num_vertices
@@ -156,7 +153,7 @@ impl Imported {
                         
                     }
 
-                    if(face_data.len()!=3){
+                    if face_data.len()!=3 {
                         continue;
                     }
 
