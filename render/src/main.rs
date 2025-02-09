@@ -1,6 +1,7 @@
 use minifb::{Key, Window, WindowOptions};
 use std::time::Instant;
 
+
 use std::env;
 
 use crate::world::World;
@@ -63,7 +64,7 @@ fn main() {
 
     env::set_var("RUST_BACKTRACE", "1");
 
-    let view = View::new(0.,0.,30.,0.,0.,0.,1., WIDTH, HEIGHT);
+    let view = View::new(0.,0.,50.,0.,0.,0.,1., WIDTH, HEIGHT);
     let world = World::new();
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
 
@@ -138,9 +139,9 @@ fn main() {
             }else if window.is_key_down(Key::G){
                 use_wireframe = !use_wireframe;
             }else if window.is_key_down(Key::N){
-                renderer.view.translate_about_window(-0.003);
+                renderer.view.translate_about_window(-0.03);
             }else if window.is_key_down(Key::M){
-                renderer.view.translate_about_window(0.003);
+                renderer.view.translate_about_window(0.03);
             }
         }
 

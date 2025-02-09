@@ -178,9 +178,10 @@ impl View{
         // for now, we will just step forward and backward
         //self.move_forward(val);
 
+        self.fov += val;
 
         // theoretical distance from window
-        self.dist_from_window += val;
+        //self.dist_from_window += val;
         
 
         // self.fov += val;
