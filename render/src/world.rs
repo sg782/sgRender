@@ -23,24 +23,24 @@ impl World{
 
         // //test with a row of cubes
         let side_length = 3.;
-        let amount_wide = 10;
-        let amount_high = 10;
+        let amount_wide = 3;
+        let amount_high = 3;
         let mut count: u32 = 0;
         for i in -amount_wide..amount_wide{
             for j in -amount_high..amount_high{
                 count +=1;
                     let idx = i as f32;
                     let jdx = j as f32;
-                    let cube = Cube::new(side_length * idx,side_length * jdx,0.,side_length, 0xA028 * count);
+                    let cube = Cube::new((side_length + 1.) * idx,0.,(side_length + 1.) * jdx,side_length, 0xA028 * count);
                     elements.push(Box::new(cube));
             }
         }
 
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer
         
-        // let teapot = Imported::new("../../3d_models/teapot.obj",100.,0.,0.,0.);
+        let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
 
-        // elements.push(Box::new(teapot));
+        elements.push(Box::new(teapot));
         // let g: f32 = 1.22/2.;
         // let x_pt = g.tan();
 

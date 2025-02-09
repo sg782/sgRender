@@ -610,7 +610,7 @@ impl Renderer {
 
         let transformed_coords = self.compute_vertex_screen_coordinates();
 
-
+        //println!("{:?}", transformed_coords);
 
         
 
