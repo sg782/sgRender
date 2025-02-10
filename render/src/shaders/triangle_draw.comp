@@ -120,19 +120,26 @@ void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
 
     float inv_median_z = left_inv_w + ((right_inv_w-left_inv_w) * ((v0[0] - left[0]) / (right[0] - left[0])));
 
-    float median_z = left[3] + ((right[3] - left[3]) * ((v0[0] - left[0]) / (right[0] - left[0])));
-    vec4 v3 = vec4(v0[0], v2[1],0,inv_median_z);
+    //float median_z = left[3] + ((right[3] - left[3]) * ((v0[0] - left[0]) / (right[0] - left[0])));
+    //vec4 v3 = vec4(v0[0], v2[1],0,inv_median_z);
 
 
 
     // float dz_dy = (v3[3]-v0[3])/(v3[1]-v0[1]);
     // float dz_dx = (right[3]-v3[3])/(right[0]-v3[0]);
 
-    float dz_dy = (inv_median_z-v_0_inv_w)/(v3[1]-v0[1]);
+    float dz_dy = (inv_median_z-v_0_inv_w)/(v2[1]-v0[1]);
     float dz_dx = (right_inv_w-left_inv_w)/(right[0]-left[0]);
 
 
     float avg_depth = (v0[3] + v1[3] + v2[3]) / 3.;
+
+    uint c = color_buffer.data[face_id];
+    vec4 color = uvec4(
+        mod(c,256),
+        mod(c/256,256),
+        mod(c/(256*256),256),
+    0);
 
 
 
@@ -148,22 +155,17 @@ void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
             uint int_j = int(j + 0.5);
 
 
-            float interpolated_invW = v3[3] + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
+            float interpolated_invW = inv_median_z + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
             float intermediate_depth = 1.0 / interpolated_invW;
 
             // if currently blocked
-            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > avg_depth){
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
                 continue;
             }else{
-                depth_buffer.data[int_i * int(push.screen_width) + int_j] = avg_depth;
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
             }
 
-            uint c = color_buffer.data[face_id];
-            vec4 color = uvec4(
-                mod(c,256),
-                mod(c/256,256),
-                mod(c/(256*256),256),
-                0);
+
             vec4 to_write = color / 255;
 
             ivec2 coord = ivec2(int_j,int_i);
@@ -198,8 +200,6 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
         left = v0;
     }
 
-    // float inv_slope_1 = (v2[0] - left[0]) / (v2[1] - left[1]);
-    // float inv_slope_2 = (v2[0] - right[0]) / (v2[1] - right[1]);
 
     float left_inv_w = 1. / left[3];
     float right_inv_w = 1. / right[3];
@@ -207,14 +207,19 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
 
     float inv_median_z = left_inv_w + ((right_inv_w-left_inv_w) * ((v2[0] - left[0]) / (right[0] - left[0])));
 
-    float median_z = left[3] + ((right[3] - left[3]) * ((v2[0] - left[0]) / (right[0] - left[0])));
-    vec4 v3 = vec4(v2[0], v0[1],0,inv_median_z);
 
-    float dz_dy = (inv_median_z-v_2_inv_w)/(v3[1]-v2[1]);
+    float dz_dy = (inv_median_z-v_2_inv_w)/(v0[1]-v2[1]);
     float dz_dx = (right_inv_w-left_inv_w)/(right[0]-left[0]);
 
 
     float avg_depth = (v0[3] + v1[3] + v2[3]) / 3.;
+
+    uint c = color_buffer.data[face_id];
+    vec4 color = uvec4(
+        mod(c,256),
+        mod(c/256,256),
+        mod(c/(256*256),256),
+        0);
     
 
     for(float i = v2[1]; i>v0[1]; i--){
@@ -229,14 +234,14 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
             uint int_j = int(j+0.5);
 
 
-            float interpolated_invW = v3[3] + ((i - v2[1]) * dz_dy) + ((j - v2[0]) * dz_dx);
+            float interpolated_invW = inv_median_z + ((i - v2[1]) * dz_dy) + ((j - v2[0]) * dz_dx);
             float intermediate_depth = 1.0 / interpolated_invW;
 
             // if currently blocked
-            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > avg_depth){
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
                 continue;
             }else{
-                depth_buffer.data[int_i * int(push.screen_width) + int_j] = avg_depth;
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
             }
 
 
@@ -249,12 +254,7 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
             // }
 
 
-            uint c = color_buffer.data[face_id];
-            vec4 color = uvec4(
-                mod(c,256),
-                mod(c/256,256),
-                mod(c/(256*256),256),
-                0);
+
             vec4 to_write = color / 255;
 
 
@@ -271,74 +271,6 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
 
 }
 
-/*
-
-void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id){
-    float inv_slope_1 = (v2[0] - v0[0]) / (v2[1] - v0[1]);
-    float inv_slope_2 = (v2[0] - v1[0]) / (v2[1]- v1[1]);
-
-    float cur_x_1 = v2[0];
-    float cur_x_2 = v2[0];
-
-    vec4 vr; // right point
-    vec4 vl;
-    if(v1[0]>v2[0]){
-        vr = v1;
-        vl = v2;
-    }else{
-        vr = v2;
-        vl = v1;
-    }
-
-
-
-    float avg_depth = (v0[3] + v1[3] + v2[3]) / 3.;
-    
-
-    for(float i = v2[1]; i>v0[1]; i--){
-        for(float j = min(cur_x_1,cur_x_2); j<max(cur_x_1,cur_x_2);j++){
-
-            if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
-                return;
-            }
-
-
-            uint int_i = int(i+0.5);
-            uint int_j = int(j+0.5);
-
-
-
-            // if currently blocked
-            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > avg_depth){
-                continue;
-            }else{
-                depth_buffer.data[int_i * int(push.screen_width) + int_j] = avg_depth;
-            }
-
-
-            uint c = color_buffer.data[face_id];
-            vec4 color = uvec4(
-                mod(c,256),
-                mod(c/256,256),
-                mod(c/(256*256),256),
-                0);
-            vec4 to_write = color / 255;
-
-
-
-            ivec2 coord = ivec2(int(j+0.5),int(i+0.5));
-            imageStore(img, coord, to_write);     
-
-        }
-
-        cur_x_1 -= inv_slope_1;
-        cur_x_2 -= inv_slope_2;
-    }
-
-
-}
-
-*/
 
 
 void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id){

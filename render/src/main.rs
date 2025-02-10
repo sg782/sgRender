@@ -164,6 +164,6 @@ fn main() {
         //     .update_with_buffer(&pixel_buffer, WIDTH, HEIGHT)
         //     .unwrap();
 
-        println!("{} ms", now.elapsed().as_millis());
+        println!("{} ms || ~{} fps", now.elapsed().as_millis(), 1000 / now.elapsed().as_millis());
     }
 }

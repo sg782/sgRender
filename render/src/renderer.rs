@@ -15,6 +15,9 @@ use crate::primitives::line::Line;
 
 use crate::primitives::triangle::Triangle;
 
+use std::time::Instant;
+
+
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
@@ -145,6 +148,11 @@ pub struct Buffers {
 
     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
+
+    pub depth_staging_buffer: Subbuffer<[f32]>,
+    pub depth_buffer: Subbuffer<[f32]>,
+
+    
 }
 
 pub struct Renderer{
@@ -390,8 +398,6 @@ impl Renderer {
             color_data.push(mesh.color());
         }
 
-        println!("{:?}", color_data);
-
         let buffer_size: u64 = (color_data.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
 
 
@@ -494,6 +500,40 @@ impl Renderer {
             std::mem::size_of::<BoundingPoint>() as u64 * bounding_boxes.len() as u64
         ).expect("Failed to create storage buffer!");
 
+
+        let mut depth_vec: Vec<f32> = vec![-INFINITY; (screen_width * screen_height) as usize]; 
+        let buffer_size = (depth_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
+
+
+        let depth_staging_buffer: Subbuffer<[f32]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            depth_vec.iter().cloned(),
+
+        ).expect("failed to cretae depth buffer");
+
+                
+        let depth_buffer: Subbuffer<[f32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
         // buffer encapsulation struct
         let buffers = Buffers {
             vertex_staging_buffer,
@@ -517,6 +557,8 @@ impl Renderer {
             bounding_box_staging_buffer,
             bounding_box_buffer,
 
+            depth_staging_buffer,
+            depth_buffer,
 
 
         };
@@ -608,19 +650,29 @@ impl Renderer {
 
         self.frame_count += 1;
 
-        self.compute_vertex_screen_coordinates();
 
         //println!("{:?}", transformed_coords);
 
         
+        // time each function
+        let now = Instant::now();
+            self.compute_vertex_screen_coordinates();
+        println!("Calculate Vertices: {} ms ", now.elapsed().as_millis());
 
-        //self.draw_wireframe(window, screen_width, screen_height);
+        let now2 = Instant::now();
+            self.draw_faces(window);
+        println!("Triangle Render: {} ms ", now2.elapsed().as_millis());
 
-        self.draw_faces(window);
+
+
+        //self.draw_wireframe(window);
+
 
     }
 
-    fn compute_vertex_screen_coordinates (&self) -> Vec<Vector4<f32>> {
+    fn compute_vertex_screen_coordinates (&self){ //} -> Vec<Vector4<f32>> {
+
+
 
 
         let mut write_lock = self.buffers.transform_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
@@ -693,9 +745,9 @@ impl Renderer {
             )
             .unwrap()
             .dispatch(work_group_counts)
-            .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
             .unwrap();
+            // .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
+            // .unwrap();
         
         let command_buffer = command_buffer_builder.build().unwrap();
     
@@ -707,12 +759,18 @@ impl Renderer {
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
     
-    let content = self.buffers.vertex_readback_buffer.read().unwrap();
+    let now2 = Instant::now();
+
+    // let content = self.buffers.vertex_readback_buffer.read().unwrap();
 
 
-    let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
+    // let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
 
-    out
+
+
+    println!("Reread: {} ms ", now2.elapsed().as_millis());
+
+    //out
     }
 
 
@@ -1073,6 +1131,7 @@ impl Renderer {
 
     fn draw_faces(&self, window: &mut Window){
 
+
         let pixel_image = Image::new(
             self.render_information.memory_allocator.clone(),
             ImageCreateInfo {
@@ -1106,12 +1165,16 @@ impl Renderer {
         ).expect("Failed to create readback buffer!");
 
 
+
+
         let in_vec = self.calculate_in_view();
 
 
         // println!("B: {:?}", in_veca);
 
         //println!("inVec: {:?}", in_vec);
+
+
 
 
         let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
@@ -1144,49 +1207,6 @@ impl Renderer {
             },
             buffer_size
         ).expect("Failed to create storage buffer!");
-
-
-
-        let mut depth_vec: Vec<f32> = vec![-INFINITY; (self.screen_width * self.screen_height) as usize]; 
-        let buffer_size = (depth_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
-
-
-
-        let depth_staging_buffer: Subbuffer<[f32]> = Buffer::from_iter( 
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            depth_vec.iter().cloned(),
-
-        ).expect("failed to cretae depth buffer");
-
-        
-        let depth_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-
-
-
-        // println!("B: {:?}", in_veca);
-
-        //println!("inVec: {:?}", in_vec);
 
 
 
@@ -1223,7 +1243,7 @@ impl Renderer {
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
                 WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
                 WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
-                WriteDescriptorSet::buffer(4, depth_buffer.clone()),
+                WriteDescriptorSet::buffer(4, self.buffers.depth_buffer.clone()),
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
                 WriteDescriptorSet::image_view(6, pixel_image_view.clone()),
                 ], 
@@ -1247,14 +1267,14 @@ impl Renderer {
             z: self.view.z,
         };
 
+
        
        let copy_operations = [
         CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
         CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
-        CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.color_staging_buffer.clone(), self.buffers.color_buffer.clone()),
-        CopyBufferInfo::buffers(depth_staging_buffer.clone(), depth_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.depth_staging_buffer.clone(), self.buffers.depth_buffer.clone()),
        ];
 
        for copy_op in copy_operations{
@@ -1288,6 +1308,8 @@ impl Renderer {
             .unwrap();
         let command_buffer = command_buffer_builder.build().unwrap();
     
+
+
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
             .unwrap()
@@ -1301,8 +1323,6 @@ impl Renderer {
         let content = output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
-
-
 
 
 

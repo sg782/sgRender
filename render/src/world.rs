@@ -22,25 +22,30 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        let side_length = 3.;
-        let amount_wide = 10;
-        let amount_high = 10;
-        let amount_deep = 3;
-        let mut count: u32 = 0;
+        let side_length = 1.;
+        let amount_wide = 40;
+        let amount_high = 40;
+        let amount_deep = 1;
+        let mut count: f32 = 0.;
         for i in -amount_wide..amount_wide{
             for j in -amount_high..amount_high{
                 //for k in -amount_deep..amount_deep{
-                    count +=1;
+                    count +=1.;
                     let idx = i as f32;
                     let jdx = j as f32;
                     //let kdx = k as f32;
-                    let cube = Cube::new((side_length) * idx ,(side_length) * jdx, (idx * idx + jdx * jdx) * 0.3 ,side_length, 0xA028 * count);
+                    let r = 60.;// * (1.5+kdx);
+                    let cube = Cube::new(r * (count/30.).sin() ,r * (count/30.).cos(), count / 30. ,side_length, 0xA028 * count as u32);
                     elements.push(Box::new(cube));
 
                 //}
 
             }
         }
+
+        println!("NUM items; {}", count);
+
+
 
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer
         
