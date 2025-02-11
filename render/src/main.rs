@@ -83,7 +83,7 @@ fn main() {
 
     
 
-    window.set_target_fps(300);
+    window.set_target_fps(500);
 
     // toggle with 'g'
     let mut use_wireframe: bool = true;
@@ -92,7 +92,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {   
 
 
-        let movement_val = 2.;
+        let movement_val = 0.4;
 
         // random keys for testing
         // will clean up later

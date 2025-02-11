@@ -27,6 +27,7 @@ pub struct RenderInformation {
     pub line_draw_compute_pipeline: Arc<ComputePipeline>,
     pub in_view_compute_pipeline: Arc<ComputePipeline>,
     pub triangle_draw_compute_pipeline: Arc<ComputePipeline>,
+    pub work_group_counts: [u32;3],
 }
 
 impl RenderInformation {
@@ -147,6 +148,9 @@ impl RenderInformation {
         .expect("failed to create compute pipeline");
 
 
+        let work_group_counts = [1024,1,1];
+
+
         Self {
             device,
             queue,
@@ -156,6 +160,7 @@ impl RenderInformation {
             line_draw_compute_pipeline,
             in_view_compute_pipeline,
             triangle_draw_compute_pipeline,
+            work_group_counts,
         }
     }
 

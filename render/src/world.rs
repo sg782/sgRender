@@ -1,6 +1,10 @@
 
+use nalgebra::Vector3;
+
 use crate::mesh::mesh::Mesh;
 use crate::models::cube::Cube;
+use crate::models::plane::Plane;
+
 use crate::models::imported::Imported;
 
 pub struct World{
@@ -22,29 +26,47 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        let side_length = 1.;
-        let amount_wide = 40;
-        let amount_high = 40;
-        let amount_deep = 1;
+        let side_length = 3.;
+        let amount_wide = 1;
+        let amount_high = 1;
+        let amount_deep = 10;
         let mut count: f32 = 0.;
-        for i in -amount_wide..amount_wide{
-            for j in -amount_high..amount_high{
-                //for k in -amount_deep..amount_deep{
+        for i in 0..amount_wide{
+            for j in 0..amount_high{
+                for k in -amount_deep..amount_deep{
                     count +=1.;
                     let idx = i as f32;
                     let jdx = j as f32;
-                    //let kdx = k as f32;
-                    let r = 60.;// * (1.5+kdx);
-                    let cube = Cube::new(r * (count/30.).sin() ,r * (count/30.).cos(), count / 30. ,side_length, 0xA028 * count as u32);
+                    let kdx = k as f32;
+                    let r = 4.* (4.1+kdx);
+                    //let cube = Cube::new(r * (count/300.).sin() ,r * (count/200.).cos(), count / 5. ,side_length, 0xA028 * count as u32);
+                    let cube = Cube::new(idx * side_length + 1.,jdx * side_length + 1., kdx * side_length, side_length-1., 0xC028 * count as u32);
+
+                    // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
+
+                    // elements.push(Box::new(teapot));
+
                     elements.push(Box::new(cube));
 
-                //}
+                }
 
             }
         }
 
         println!("NUM items; {}", count);
 
+        // let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
+        // let v1: Vector3<f32> = Vector3::new(30.,50.,6.);
+
+        // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
+        // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
+
+        // let p0 = Plane::new(v1,v0,0xFFCC88);
+
+        // let p1 = Plane::new(v2,v3,0x3FDD88);
+
+        // elements.push(Box::new(p0));
+        // elements.push(Box::new(p1));
 
 
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer

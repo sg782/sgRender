@@ -1,4 +1,5 @@
 use std::f32::INFINITY;
+use std::ops::Sub;
 
 use crate::world::World;
 use crate::view::View;
@@ -152,6 +153,8 @@ pub struct Buffers {
     pub depth_staging_buffer: Subbuffer<[f32]>,
     pub depth_buffer: Subbuffer<[f32]>,
 
+    pub in_view_staging_buffer: Subbuffer<[u32]>,
+    pub in_view_buffer: Subbuffer<[u32]>,
     
 }
 
@@ -163,6 +166,7 @@ pub struct Renderer{
     pub frame_count: u64,
     pub screen_width: usize,
     pub screen_height: usize,
+
 }
 
 impl Renderer {
@@ -534,6 +538,40 @@ impl Renderer {
         ).expect("Failed to create storage buffer!");
 
 
+        let in_vec = vec![0; vertice_indices.len()]; 
+
+
+
+        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            in_vec.iter().cloned(),
+
+        ).expect("failed to cretae staging buffer");
+
+        
+        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+
         // buffer encapsulation struct
         let buffers = Buffers {
             vertex_staging_buffer,
@@ -559,6 +597,9 @@ impl Renderer {
 
             depth_staging_buffer,
             depth_buffer,
+
+            in_view_staging_buffer,
+            in_view_buffer,
 
 
         };
@@ -655,13 +696,13 @@ impl Renderer {
 
         
         // time each function
-        let now = Instant::now();
-            self.compute_vertex_screen_coordinates();
-        println!("Calculate Vertices: {} ms ", now.elapsed().as_millis());
+        self.compute_vertex_screen_coordinates();
 
-        let now2 = Instant::now();
-            self.draw_faces(window);
-        println!("Triangle Render: {} ms ", now2.elapsed().as_millis());
+        self.draw_faces(window);
+
+
+
+
 
 
 
@@ -686,7 +727,6 @@ impl Renderer {
         .unwrap();
     
 
-        let work_group_counts = [512, 1, 1];
 
 
         let descriptor_set_allocator =
@@ -744,10 +784,15 @@ impl Renderer {
                 descriptor_set,
             )
             .unwrap()
-            .dispatch(work_group_counts)
+            .dispatch(self.render_information.work_group_counts)
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone()))
             .unwrap();
             // .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
             // .unwrap();
+
+
+
         
         let command_buffer = command_buffer_builder.build().unwrap();
     
@@ -758,19 +803,14 @@ impl Renderer {
         .unwrap();
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
+
+
+    let content = self.buffers.vertex_readback_buffer.read().unwrap();
+    println!("here!:");
+    for v in content.iter(){
+        println!("{:?}", v);
+    }
     
-    let now2 = Instant::now();
-
-    // let content = self.buffers.vertex_readback_buffer.read().unwrap();
-
-
-    // let out: Vec<Vector4<f32>> = content.iter().map(|&v| Vector4::from(v)).collect();
-
-
-
-    println!("Reread: {} ms ", now2.elapsed().as_millis());
-
-    //out
     }
 
 
@@ -793,7 +833,6 @@ impl Renderer {
         .unwrap();
 
 
-
         let image_view = ImageView::new_default(image.clone()).unwrap();
 
         let image_size = self.screen_width * self.screen_height * 4; // RGBA, 4 bytes per pixel
@@ -810,57 +849,6 @@ impl Renderer {
             image_size as u64, // Corrected buffer size
         ).expect("Failed to create readback buffer!");
 
-        // Wrap in ImageView	Use ImageView::new_default(image)	Allows shaders to access RawImage
-        // Bind to Descriptor Set	Use WriteDescriptorSet::image_view()	Makes image available to the compute shader
-        // Use imageStore() in GLSL	Write pixels directly to image2D	Avoids slow buffer copies
-        // Copy to Swapchain	Use copy_image() after compute dispatch	Displays rendered pixels
-
-
-        // println!("-=-=-=-=-=-=-=-");
-        // println!("A: {:?}", in_vec);
-
-
-        
-        let in_vec = self.calculate_in_view();
-
-
-        // println!("B: {:?}", in_veca);
-
-        //println!("inVec: {:?}", in_vec);
-
-
-        let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
-
-
-        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            in_vec.iter().cloned(),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
@@ -869,14 +857,6 @@ impl Renderer {
         )
         .unwrap();
     
-
-        
-
-        let work_group_counts = [512,1,1];
-
-
-        
-
 
         let descriptor_set_allocator =
             StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
@@ -897,7 +877,7 @@ impl Renderer {
             [
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
-                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
                 WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
                 WriteDescriptorSet::image_view(4, image_view.clone()),
 
@@ -906,14 +886,7 @@ impl Renderer {
         )
         .unwrap();
 
-               
-        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
-        // .unwrap()
-
-        
         let dist_scale: f32 = self.view.near / self.view.dist_from_window; // check calculations 
-
-
 
         let push_constants = PushConstantsB {
             a: self.screen_width as f32,
@@ -924,8 +897,6 @@ impl Renderer {
        let copy_operations = [
         CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
-        CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
-        CopyBufferInfo::buffers(self.buffers.vertex_readback_buffer.clone(), self.buffers.vertex_buffer.clone()),
        ];
 
        for copy_op in copy_operations{
@@ -950,13 +921,14 @@ impl Renderer {
                 ..ClearColorImageInfo::image(image.clone())
             })
                 .unwrap()
-            .dispatch(work_group_counts)
+            .dispatch(self.render_information.work_group_counts)
                 .unwrap()
             .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
                 image.clone(),
                 output_img_buf.clone(),
             ))
             .unwrap();
+
         let command_buffer = command_buffer_builder.build().unwrap();
     
         let future = sync::now(self.render_information.device.clone())
@@ -964,6 +936,10 @@ impl Renderer {
             .unwrap()
         .then_signal_fence_and_flush()
             .unwrap();
+
+
+        
+
 
     
         future.wait(None).unwrap();  // Ensures GPU completion before reading
@@ -976,7 +952,7 @@ impl Renderer {
 
     }
 
-    fn calculate_in_view(&self) -> Vec<u32>{
+    fn calculate_in_view(&self){ //} -> Vec<u32>{
 
         let frustum_faces = &self.view.frustum_faces;
 
@@ -1013,36 +989,6 @@ impl Renderer {
         ).expect("Failed to create storage buffer!");
 
 
-
-        
-        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            self.world.elements.len() as u64,
-        ).expect("Failed to create storage buffer!");
-
-        let in_view_readback_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
-                ..Default::default()
-            },
-            self.world.elements.len() as u64,
-        ).expect("Failed to create readback buffer!");
-
-
-
     
         
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
@@ -1052,7 +998,6 @@ impl Renderer {
         )
         .unwrap();
     
-        let work_group_counts = [512, 1, 1];
 
         let descriptor_set_allocator =
             StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
@@ -1071,20 +1016,13 @@ impl Renderer {
             [
                 WriteDescriptorSet::buffer(0, self.buffers.bounding_box_buffer.clone()),
                 WriteDescriptorSet::buffer(1,frustum_faces_buffer.clone()),
-                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
                 ], 
             [],
         )
         .unwrap();     
 
 
-     
-               
-        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
-        // .unwrap()
-
-
-    
         command_buffer_builder
             .copy_buffer(CopyBufferInfo::buffers(self.buffers.bounding_box_staging_buffer.clone(), self.buffers.bounding_box_buffer.clone()))
                 .unwrap()
@@ -1099,10 +1037,9 @@ impl Renderer {
                 descriptor_set,
             )
                 .unwrap()
-            .dispatch(work_group_counts)
-                .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(in_view_buffer.clone(), in_view_readback_buffer.clone()))
+            .dispatch(self.render_information.work_group_counts)
                 .unwrap();
+
 
         let command_buffer = command_buffer_builder.build().unwrap();
     
@@ -1113,21 +1050,9 @@ impl Renderer {
         .unwrap();
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
-    
-    let content = in_view_readback_buffer.read().unwrap();
-
-
-    let mut out: Vec<u32> = Vec::new();
-
-    for val in content.iter() {
-        out.push(*val);
-    }
-
-    
-
-    out
         
     }
+
 
     fn draw_faces(&self, window: &mut Window){
 
@@ -1164,51 +1089,7 @@ impl Renderer {
             pixel_image_size as u64, // Corrected buffer size
         ).expect("Failed to create readback buffer!");
 
-
-
-
-        let in_vec = self.calculate_in_view();
-
-
-        // println!("B: {:?}", in_veca);
-
-        //println!("inVec: {:?}", in_vec);
-
-
-
-
-        let buffer_size = (in_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
-
-
-        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            in_vec.iter().cloned(),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
+        self.calculate_in_view();
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
@@ -1217,7 +1098,6 @@ impl Renderer {
         )
         .unwrap();
     
-        let work_group_counts = [512,1,1];
 
 
     
@@ -1241,7 +1121,7 @@ impl Renderer {
             [
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
-                WriteDescriptorSet::buffer(2, in_view_buffer.clone()),
+                WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
                 WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(4, self.buffers.depth_buffer.clone()),
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
@@ -1251,9 +1131,6 @@ impl Renderer {
         )
         .unwrap();
 
-               
-        // .copy_buffer(CopyBufferInfo::buffers(transform_staging_buffer.clone(), transform_buffer.clone()))
-        // .unwrap()
 
 
         let push_constants = PushConstantsC {
@@ -1272,7 +1149,6 @@ impl Renderer {
        let copy_operations = [
         CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
-        CopyBufferInfo::buffers(in_view_staging_buffer.clone(), in_view_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.color_staging_buffer.clone(), self.buffers.color_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.depth_staging_buffer.clone(), self.buffers.depth_buffer.clone()),
        ];
@@ -1295,11 +1171,11 @@ impl Renderer {
             )
                 .unwrap()
             .clear_color_image(ClearColorImageInfo {
-                clear_value: ClearColorValue::Float([0.0, 0.0, 0.0, 1.0]),
+                clear_value: ClearColorValue::Float([0.5, 0.5, 0.5, 1.0]),
                 ..ClearColorImageInfo::image(pixel_image.clone())
             })
                 .unwrap()
-            .dispatch(work_group_counts)
+            .dispatch(self.render_information.work_group_counts)
                 .unwrap()
             .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
                 pixel_image.clone(),
