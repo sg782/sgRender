@@ -1,4 +1,4 @@
-use nalgebra::Vector4;
+use nalgebra::{Vector3, Vector4};
 pub struct Point{
     pub position: Vector4<f32>,
 }
@@ -16,6 +16,13 @@ impl Point{
         Point {
             position: Vector4::new(coords[0],coords[1],coords[2],1.)
         }
+    }
+
+    pub fn as_vec3(&self) -> Vector3<f32> {
+        self.position.xyz()
+    }
+    pub fn as_vec4(&self) -> Vector4<f32> {
+        self.position
     }
 }
 

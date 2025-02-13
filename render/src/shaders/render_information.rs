@@ -148,7 +148,7 @@ impl RenderInformation {
         .expect("failed to create compute pipeline");
 
 
-        let work_group_counts = [1024,1,1];
+        let work_group_counts = [8192,1,1];
 
 
         Self {

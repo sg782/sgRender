@@ -157,7 +157,12 @@ impl Imported {
                         continue;
                     }
 
-                    faces.push(Face::new_from_vec(face_data));
+                    faces.push(Face::new_from_vec(
+                        &face_data, 
+                        vertices[face_data[0] as usize].as_vec3(), 
+                        vertices[face_data[1] as usize].as_vec3(), 
+                        vertices[face_data[2] as usize].as_vec3()
+                    ));
 
                 }
             }

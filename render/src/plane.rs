@@ -20,6 +20,8 @@ impl Plane {
     pub fn from_points(p0:Vector3<f32>, p1: Vector3<f32>, p2: Vector3<f32>) -> Plane{
         let v = p1 - p0;
         let u = p2 - p0;
+
+        // vector faces downward?? I think i have a logical issue here 
         let n = v.cross(&u).normalize();
 
         let distance = - (n.dot(&p0));

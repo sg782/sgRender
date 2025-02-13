@@ -57,11 +57,117 @@ impl Cube{
         let num_vertices = vertices.len();
 
 
-        // Define the 12 triangular faces of the cube
+        // Define the 12 triangular faces of the cube, carefully constructed for normal vectors to face outward
 
         // Bottom face (0, 1, 2, 3)
 
-        // left
+
+        // left (right)
+        faces.push(Face::new(
+            0,3,1, 
+            vertices[0].as_vec3(), 
+            vertices[3].as_vec3(), 
+            vertices[1].as_vec3()
+        ));
+        faces.push(Face::new(
+            0,2,3, 
+            vertices[0].as_vec3(), 
+            vertices[2].as_vec3(), 
+            vertices[3].as_vec3()
+        ));
+        
+
+        // top (back)
+        faces.push(Face::new(
+            1,7,5, 
+            vertices[1].as_vec3(), 
+            vertices[7].as_vec3(), 
+            vertices[5].as_vec3()
+        ));
+        faces.push(Face::new(
+            1,3,7, 
+            vertices[1].as_vec3(), 
+            vertices[3].as_vec3(), 
+            vertices[7].as_vec3()
+        ));
+        
+
+        // bottom (front)
+        faces.push(Face::new(
+            0,4,2, 
+            vertices[0].as_vec3(), 
+            vertices[4].as_vec3(), 
+            vertices[2].as_vec3()
+        ));
+        faces.push(Face::new(
+            2,4,6, 
+            vertices[2].as_vec3(), 
+            vertices[4].as_vec3(), 
+            vertices[6].as_vec3()
+        ));
+
+        
+        //right (left)
+        faces.push(Face::new(
+            4,5,6, 
+            vertices[4].as_vec3(), 
+            vertices[5].as_vec3(), 
+            vertices[6].as_vec3()
+        ));
+        faces.push(Face::new(
+            5,7,6, 
+            vertices[5].as_vec3(), 
+            vertices[7].as_vec3(), 
+            vertices[6].as_vec3()
+        ));
+
+
+
+        //front (bottom)
+        faces.push(Face::new(
+            2,7,3, 
+            vertices[2].as_vec3(), 
+            vertices[7].as_vec3(), 
+            vertices[3].as_vec3()
+        ));
+        faces.push(Face::new(
+            2,6,7, 
+            vertices[2].as_vec3(), 
+            vertices[6].as_vec3(), 
+            vertices[7].as_vec3()
+        ));
+
+        
+        //back (top)
+        faces.push(Face::new(
+            0,1,5, 
+            vertices[0].as_vec3(), 
+            vertices[1].as_vec3(), 
+            vertices[5].as_vec3()
+        ));
+        faces.push(Face::new(
+            0,5,4, 
+            vertices[0].as_vec3(), 
+            vertices[5].as_vec3(), 
+            vertices[4].as_vec3()
+        ));
+
+        
+
+        Cube {
+            vertices,
+            faces,
+            bounding_box,
+            color,
+            num_vertices,
+        }
+        
+    }
+}
+
+
+/*
+
         faces.push(Face::new(0,1,3));
         faces.push(Face::new(0,2, 3));
 
@@ -83,16 +189,4 @@ impl Cube{
 
         //back
         faces.push(Face::new(0, 1, 5));
-        faces.push(Face::new(0, 4, 5));
-
-        Cube {
-            vertices,
-            faces,
-            bounding_box,
-            color,
-            num_vertices,
-        }
-        
-    }
-}
-
+        faces.push(Face::new(0, 4, 5)); */

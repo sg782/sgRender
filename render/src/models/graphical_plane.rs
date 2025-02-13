@@ -3,7 +3,7 @@ use crate::mesh::point::Point;
 use crate::mesh::mesh::Mesh;
 use nalgebra::{Vector2,Vector3};
 
-pub struct Plane {
+pub struct GraphicalPlane {
     vertices: Vec<Point>,
     faces: Vec<Face>,
     bounding_box: Vector2<Vector3<f32>>,
@@ -12,7 +12,7 @@ pub struct Plane {
 
 }
 
-impl Mesh for Plane {
+impl Mesh for GraphicalPlane {
     fn vertices(&self) -> &Vec<Point> {
         &self.vertices
     }
@@ -34,9 +34,9 @@ impl Mesh for Plane {
     }
 }
 
-impl Plane{
+impl GraphicalPlane{
     
-    pub fn new(v0: Vector3<f32>, v1: Vector3<f32>, color: u32) -> Plane{
+    pub fn new(v0: Vector3<f32>, v1: Vector3<f32>, color: u32) -> GraphicalPlane{
         let mut faces: Vec<Face> = Vec::new();
         let mut vertices: Vec<Point> = Vec::new();
 
@@ -46,8 +46,18 @@ impl Plane{
         vertices.push(Point::new(v1.x,v0.y,v1.z));
         vertices.push(Point::new(v1.x,v1.y,v1.z));
 
-        faces.push(Face::new(0,1,2));
-        faces.push(Face::new(1,2,3));
+        faces.push(Face::new(
+            0,1,2, 
+            vertices[0].as_vec3(), 
+            vertices[1].as_vec3(), 
+            vertices[2].as_vec3()
+        ));
+        faces.push(Face::new(
+            1,2,3, 
+            vertices[1].as_vec3(), 
+            vertices[2].as_vec3(), 
+            vertices[3].as_vec3()
+        ));
 
 
         
@@ -56,7 +66,7 @@ impl Plane{
         let num_vertices = vertices.len();
 
 
-        Plane {
+        GraphicalPlane {
             vertices,
             faces,
             bounding_box,

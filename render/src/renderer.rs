@@ -123,6 +123,8 @@ struct PushConstantsC {
     z: f32,
 }
 
+
+
 pub struct Buffers { 
 
     // vertices
@@ -139,6 +141,9 @@ pub struct Buffers {
     //faces_buffer
     pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
     pub face_buffer: Subbuffer<[[u32; 4]]>,
+
+    pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
+    pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
 
     pub color_staging_buffer: Subbuffer<[u32]>,
     pub color_buffer: Subbuffer<[u32]>,
@@ -175,6 +180,8 @@ impl Renderer {
 // pass render information in
 
     pub fn new(world: World, view: View, screen_width: usize, screen_height: usize) -> Renderer{
+
+        // I should organize this more
 
 
         let library = VulkanLibrary::new().expect("no local Vulkan library/DLL");
@@ -353,6 +360,8 @@ impl Renderer {
 
 
         let mut face_data: Vec<Vector4<usize>> = Vec::new();
+        let mut face_normals: Vec<Vector3<f32>> = Vec::new();
+
         for (i,mesh) in world.elements.iter().enumerate() {
             for face in mesh.faces(){
                 face_data.push(Vector4::new(
@@ -361,6 +370,7 @@ impl Renderer {
                     face.vertex_ids[2] as usize, 
                     i
                 ));
+                face_normals.push(face.normal);
             }
         }
 
@@ -396,6 +406,35 @@ impl Renderer {
             buffer_size
         ).expect("Failed to create storage buffer!");
 
+
+        let buffer_size: u64 = (face_normals.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
+        let face_normal_staging_buffer: Subbuffer<[[f32;4]]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            face_normals
+            .iter() // Iterate over `Vec<[f32; 4]>`
+            .map(|&v| [v[0], v[1], v[2], 0.]),
+        ).expect("failed to cretae staging buffer");
+
+        let face_normal_buffer: Subbuffer<[[f32;4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
 
         let mut color_data: Vec<u32> = Vec::new();
         for mesh in &world.elements{
@@ -586,6 +625,9 @@ impl Renderer {
             face_staging_buffer,
             face_buffer,
 
+            face_normal_staging_buffer,
+            face_normal_buffer,
+
             color_staging_buffer,
             color_buffer,
             
@@ -688,22 +730,10 @@ impl Renderer {
 
 
     pub fn render(& mut self, window: &mut Window){
-
         self.frame_count += 1;
 
-
-        //println!("{:?}", transformed_coords);
-
-        
-        // time each function
         self.compute_vertex_screen_coordinates();
-
         self.draw_faces(window);
-
-
-
-
-
 
 
         //self.draw_wireframe(window);
@@ -711,7 +741,7 @@ impl Renderer {
 
     }
 
-    fn compute_vertex_screen_coordinates (&self){ //} -> Vec<Vector4<f32>> {
+    fn compute_vertex_screen_coordinates (&self){ //} -> Vec<Vector4<f32>> 
 
 
 
@@ -785,9 +815,8 @@ impl Renderer {
             )
             .unwrap()
             .dispatch(self.render_information.work_group_counts)
-            .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone()))
             .unwrap();
+
             // .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
             // .unwrap();
 
@@ -805,16 +834,18 @@ impl Renderer {
     future.wait(None).unwrap();  // Ensures GPU completion before reading
 
 
-    let content = self.buffers.vertex_readback_buffer.read().unwrap();
-    println!("here!:");
-    for v in content.iter(){
-        println!("{:?}", v);
-    }
+    // let content = self.buffers.vertex_readback_buffer.read().unwrap();
+    // println!("here!:");
+    // for v in content.iter(){
+    //     println!("{:?}", v);
+    // }
     
     }
 
 
     fn draw_wireframe(&self, window: &mut Window) {
+
+        self.calculate_in_view();
 
         let image = Image::new(
             self.render_information.memory_allocator.clone(),
@@ -936,10 +967,6 @@ impl Renderer {
             .unwrap()
         .then_signal_fence_and_flush()
             .unwrap();
-
-
-        
-
 
     
         future.wait(None).unwrap();  // Ensures GPU completion before reading
@@ -1097,10 +1124,7 @@ impl Renderer {
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
-    
 
-
-    
 
         let descriptor_set_allocator =
             StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
@@ -1125,13 +1149,12 @@ impl Renderer {
                 WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(4, self.buffers.depth_buffer.clone()),
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
-                WriteDescriptorSet::image_view(6, pixel_image_view.clone()),
+                WriteDescriptorSet::buffer(6, self.buffers.face_normal_buffer.clone()),
+                WriteDescriptorSet::image_view(7, pixel_image_view.clone()),
                 ], 
             [],
         )
         .unwrap();
-
-
 
         let push_constants = PushConstantsC {
             screen_width: self.screen_width as f32,
@@ -1144,13 +1167,12 @@ impl Renderer {
             z: self.view.z,
         };
 
-
-       
        let copy_operations = [
         CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.color_staging_buffer.clone(), self.buffers.color_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.depth_staging_buffer.clone(), self.buffers.depth_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.face_normal_staging_buffer.clone(), self.buffers.face_normal_buffer.clone()),
        ];
 
        for copy_op in copy_operations{
@@ -1201,7 +1223,5 @@ impl Renderer {
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
 
 
-
     }
 }
-

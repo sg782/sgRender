@@ -1,4 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
+use nalgebra::Vector3;
 use std::time::Instant;
 
 
@@ -8,6 +9,7 @@ use crate::world::World;
 use crate::view::View;
 use crate::renderer::Renderer;
 
+pub mod lighting;
 pub mod shaders;
 pub mod mesh;
 pub mod models;
@@ -80,7 +82,7 @@ fn main() {
     });
 
     
-
+    let mut light: Vector3<f32> = Vector3::new(1.,1.,1.);
     
 
     window.set_target_fps(500);
@@ -90,8 +92,6 @@ fn main() {
 
 
     while window.is_open() && !window.is_key_down(Key::Escape) {   
-
-
         let movement_val = 0.4;
 
         // random keys for testing
@@ -136,12 +136,6 @@ fn main() {
                 renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::Z){
                 renderer.view.rotate_yaw(rotation_val);
-            }else if window.is_key_down(Key::G){
-                use_wireframe = !use_wireframe;
-            }else if window.is_key_down(Key::N){
-                renderer.view.translate_about_window(-0.03);
-            }else if window.is_key_down(Key::M){
-                renderer.view.translate_about_window(0.03);
             }
         }
 
@@ -155,6 +149,9 @@ fn main() {
         // let t = Triangle::new(x0,100., 100.,35., 50., 450., 0xFFFFFF);
 
         // t.draw(&mut buffer, WIDTH as i64,HEIGHT as i64);
+
+
+        //println!("{} {} {}", renderer.view.x, renderer.view.y, renderer.view.z);
 
         
         renderer.render(&mut window);
