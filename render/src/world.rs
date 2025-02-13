@@ -26,33 +26,33 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        // let side_length = 4.;
-        // let amount_wide = 10;
-        // let amount_high = 10;
-        // let amount_deep = 10;
-        // let spacing = 4.;
-        // let mut count: f32 = 0.;
-        // for i in 0..amount_wide{
-        //     for j in 0..amount_high{
-        //         for k in 0..amount_deep{
-        //             count +=1.;
-        //             let idx = i as f32;
-        //             let jdx = j as f32;
-        //             let kdx = k as f32;
-        //             let r = 4.* (4.1+kdx);
-        //             //let cube = Cube::new(r * (count/300.).sin() ,r * (count/200.).cos(), count / 5. ,side_length, 0xA028 * count as u32);
-        //             let cube = Cube::new(idx * (side_length + spacing),jdx * (side_length + spacing), kdx * (side_length + spacing), side_length-1., 0xC028 * count as u32);
+        let side_length = 4.;
+        let amount_wide = 10;
+        let amount_high = 10;
+        let amount_deep = 10;
+        let spacing = 4.;
+        let mut count: f32 = 0.;
+        for i in 0..amount_wide{
+            for j in 0..amount_high{
+                for k in 0..amount_deep{
+                    count +=1.;
+                    let idx = i as f32;
+                    let jdx = j as f32;
+                    let kdx = k as f32;
+                    let r = 4.* (4.1+kdx);
+                    //let cube = Cube::new(r * (count/300.).sin() ,r * (count/200.).cos(), count / 5. ,side_length, 0xA028 * count as u32);
+                    let cube = Cube::new(idx * (side_length + spacing),jdx * (side_length + spacing), kdx * (side_length + spacing), side_length-1., 0xC028 * count as u32);
 
-        //             // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
+                    // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
 
-        //             // elements.push(Box::new(teapot));
+                    // elements.push(Box::new(teapot));
 
-        //             elements.push(Box::new(cube));
+                    elements.push(Box::new(cube));
 
-        //         }
+                }
 
-        //     }
-        // }
+            }
+        }
 
         //println!("NUM items; {}", count);
 

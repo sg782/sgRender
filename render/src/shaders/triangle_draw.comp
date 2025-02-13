@@ -138,6 +138,203 @@ void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, float li
 
 
     for(highp float i=v0[1];i<=v1[1];i++){
+        for(highp float j = cur_x_1; j< cur_x_2;j++){
+
+            if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
+                return;
+            }
+
+
+            uint int_i = int(i+0.5);
+            uint int_j = int(j+0.5);
+
+
+            // highp float interpolated_invW = inv_median_z + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
+            // highp float intermediate_depth = 1.0 / interpolated_invW;
+
+            highp float intermediate_depth = v0[3] + ((i-v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
+
+            // if currently blocked
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
+                continue;
+            }else{
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
+            }
+
+            vec4 to_write = color / 255;
+            // if(i==v2[1] || i < v0[1] + 1 || j == min(cur_x_1,cur_x_2)|| j >= max(cur_x_1,cur_x_2) - 1){
+            //     to_write = vec4(0.,0.,1.,1.);
+            // }else{
+            //     to_write = color / 255;
+            // }
+
+            to_write *= light_intensity;
+
+
+            
+            ivec2 coord = ivec2(int_j,int_i);
+            imageStore(img, coord, to_write);     
+
+        }
+
+        cur_x_1 += inv_slope_1;
+        cur_x_2 += inv_slope_2;
+
+    }
+}
+
+
+
+float get_determinant(vec2 a, vec2 b, vec2 c){
+    vec2 ab = b - a;
+    vec2 ac = c - a;
+
+    float det = (ab[1] * ac[0]) - (ab[0] * ac[1]);
+    return det;
+}
+
+
+void draw_flat_bottom_triangle_half_space(vec4 v0, vec4 v1, vec4 v2, uint face_id, float light_intensity){
+    float min_x = min(v0[0],min(v1[0],v2[0]));
+    float max_x = max(v0[0],max(v1[0],v2[0]));
+
+    float min_y = min(v0[1],min(v1[1],v2[1]));
+    float max_y = max(v0[1],max(v1[1],v2[1]));
+
+    vec4 right; // right point
+    vec4 left;
+    if(v1[0]>v2[0]){
+        right = v1;
+        left = v2;
+    }else{
+        right = v2;
+        left = v1;
+    }
+
+    uint c = color_buffer.data[face_id];
+    vec4 color = uvec4(
+        mod(c,256),
+        mod(c/256,256),
+        mod(c/(256*256),256),
+    0);
+
+    highp float median_z = left[3] + ((right[3] - left[3]) * ((v0[0] - left[0]) / (right[0] - left[0])));
+
+    highp float dz_dy =  (median_z-v0[3])/(v2[1]-v0[1]);
+    highp float dz_dx = (right[3]-left[3])/(right[0]-left[0]);
+
+
+    for(float i = floor(min_y-.5); i < floor(max_y+0.5);i++){
+        for(float j = min_x; j < max_x; j++){
+
+            uint int_i = int(i);
+            uint int_j = int(j);
+
+            highp float intermediate_depth = v0[3] + ((i-v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
+
+            vec2 pixel_pos = vec2(j,i);
+
+
+            float alpha = get_determinant(v0.xy, left.xy,pixel_pos);
+            float beta = get_determinant(left.xy,right.xy,pixel_pos);
+            float omega = get_determinant(right.xy,v0.xy,pixel_pos);
+
+
+            if(alpha<0. || beta < 0. || omega <0.){
+                continue;
+            }
+
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
+                continue;
+            }else{
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
+            }
+
+            vec4 to_write = color / 255;
+            to_write *= light_intensity;
+            ivec2 coord = ivec2(int_j,int_i);
+            imageStore(img, coord, to_write);   
+
+        }
+    }
+}
+
+void draw_flat_top_triangle_half_space(vec4 v0, vec4 v1, vec4 v2, uint face_id, float light_intensity){
+    float min_x = min(v0[0],min(v1[0],v2[0]));
+    float max_x = max(v0[0],max(v1[0],v2[0]));
+
+    float min_y = min(v0[1],min(v1[1],v2[1]));
+    float max_y = max(v0[1],max(v1[1],v2[1]));
+
+    highp float cur_x_1 = v2[0];
+    highp float cur_x_2 = v2[0];
+
+    vec4 right; // right point
+    vec4 left;
+    if(v0[0]>v1[0]){
+        right = v0;
+        left = v1;
+    }else{
+        right = v1;
+        left = v0;
+    }
+
+
+    highp float inv_slope_1 = (left[0]- v2[0]) / (left[1]- v2[1]);
+    highp float inv_slope_2 = (right[0] - v2[0]) / (right[1] - v2[1]);
+
+    highp float median_z = left[3] + ((right[3] - left[3]) * ((v2[0] - left[0]) / (right[0] - left[0])));
+
+    highp float dz_dy = (median_z - v2[3])/(v0[1]-v2[1]);
+    highp float dz_dx = (right[3] - left[3])/(right[0]-left[0]);
+    highp float avg_depth = (v0[3] + v1[3] + v2[3]) / 3.;
+
+    uint c = color_buffer.data[face_id];
+    vec4 color = uvec4(
+        mod(c,256),
+        mod(c/256,256),
+        mod(c/(256*256),256),
+        0);
+
+    
+    for(float i = floor(max_y+0.5); i > floor(min_y-0.5) ;i--){
+        for(float j = min_x; j < max_x; j++){
+            uint int_i = int(i);
+            uint int_j = int(j);
+
+            highp float intermediate_depth = v2[3] + ((i-v2[1]) * dz_dy) + ((j - v2[0]) * dz_dx);
+
+            vec2 pixel_pos = vec2(j,i);
+
+
+            float alpha = get_determinant(v2.xy, right.xy,pixel_pos);
+            float beta = get_determinant(right.xy,left.xy,pixel_pos);
+            float omega = get_determinant(left.xy,v2.xy,pixel_pos);
+
+
+            if(alpha<0. || beta < 0. || omega <0.){
+                continue;
+            }
+
+
+            // if currently blocked
+            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
+                continue;
+            }else{
+                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
+            }
+
+            vec4 to_write = color / 255;
+            to_write *= light_intensity;
+            ivec2 coord = ivec2(int_j,int_i);
+            imageStore(img, coord, to_write);   
+
+        }
+    }
+}
+
+/*
+    for(highp float i=v0[1];i<=v1[1];i++){
         for(highp float j = min(cur_x_1,cur_x_2); j<= max(cur_x_1,cur_x_2);j++){
 
             if(i<0 || i>=push.screen_height || j<0 || j>=push.screen_width) {
@@ -161,15 +358,14 @@ void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, float li
                 depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
             }
 
-            // vec4 to_write;
-            // if(i==v0[1] || i > v1[1] - 1 || j == min(cur_x_1,cur_x_2)|| j >= max(cur_x_1,cur_x_2) - 1){
-            //     to_write = vec4(0.,0.,1.,1.);
-            // }else{
-            //     to_write = color / 255;
-            // }
+            vec4 to_write;
+            if(i==v2[1] || i < v0[1] + 1 || j == min(cur_x_1,cur_x_2)|| j >= max(cur_x_1,cur_x_2) - 1){
+                to_write = vec4(0.,0.,1.,1.);
+            }else{
+                to_write = color / 255;
+            }
 
-            //vec4 to_write = color/255.;
-            vec4 to_write = (color/255.) * light_intensity;
+            to_write *= light_intensity;
 
 
             
@@ -182,7 +378,8 @@ void draw_flat_bottom_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, float li
         cur_x_2 += inv_slope_2;
 
     }
-}
+
+*/
 
 
 void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, float light_intensity){
@@ -270,14 +467,14 @@ void draw_flat_top_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, float light
             //     depth_buffer.data[int_i * int(push.screen_width) + int_j] = avg_depth;
             // }
 
-            // vec4 to_write;
+            vec4 to_write = color/ 255;
             // if(i==v2[1] || i < v0[1] + 1 || j == min(cur_x_1,cur_x_2)|| j >= max(cur_x_1,cur_x_2) - 1){
             //     to_write = vec4(0.,0.,1.,1.);
             // }else{
             //     to_write = color / 255;
             // }
 
-            vec4 to_write = (color/255.) * light_intensity;
+            to_write *= light_intensity;
 
 
             ivec2 coord = ivec2(int(j+0.5),int(i+0.5));
@@ -334,9 +531,9 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 
 
 
     if (v1[1] == v2[1]) {
-        draw_flat_bottom_triangle(v0, v1, v2, face_id, final_intensity);
+        draw_flat_bottom_triangle_half_space(v0, v1, v2, face_id, final_intensity);
     }else if(v0[1] == v1[1]) {
-        draw_flat_top_triangle(v0, v1, v2, face_id, final_intensity);
+        draw_flat_top_triangle_half_space(v0, v1, v2, face_id, final_intensity);
     }else{
 
         // calculating intersection point for both triangles
@@ -356,9 +553,9 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 
 
         vec4 v3 = vec4(v3_x,v1[1],0,v3_w);
 
-        draw_flat_bottom_triangle(v0,v1,v3, face_id, final_intensity); // works inie
+        draw_flat_bottom_triangle_half_space(v0,v1,v3, face_id, final_intensity); // works inie
 
-        draw_flat_top_triangle(v3, v1, v2, face_id,final_intensity);
+        draw_flat_top_triangle_half_space(v3, v1, v2, face_id,final_intensity);
     }
 }
 
