@@ -59,6 +59,10 @@ use vulkano::image::ImageType;
 
 use minifb::Window;
 
+use vulkano::device::{Features};
+
+
+
 
 use vulkano::image::{Image, ImageUsage, view::ImageView};
 use vulkano::format::Format;
@@ -209,10 +213,17 @@ impl Renderer {
             queue_family_properties.queue_flags.contains(QueueFlags::GRAPHICS)
         })
         .expect("couldn't find a graphical queue family") as u32;
+
+        let features = Features {
+            shader_float64: true, // Enable double-precision floating point support
+            ..Features::empty()    // Keep other features disabled unless needed
+        };
+        
     
         let (device, mut queues) = Device::new(
             physical_device,
             DeviceCreateInfo {
+                enabled_features: features,
                 // here we pass the desired queue family to use by index
                 queue_create_infos: vec![QueueCreateInfo {
                     queue_family_index,

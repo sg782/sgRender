@@ -15,9 +15,6 @@ use vulkano::pipeline::compute::ComputePipelineCreateInfo;
 
 
 
-
-
-
 pub struct RenderInformation {
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
