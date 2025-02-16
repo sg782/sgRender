@@ -56,17 +56,17 @@ impl World{
 
         //println!("NUM items; {}", count);
 
-        let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
-        let v1: Vector3<f32> = Vector3::new(30.,50.,6.);
+        // let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
+        // let v1: Vector3<f32> = Vector3::new(30.,50.,6.);
 
-        // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
-        // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
+        // // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
+        // // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
 
-        let p0 = GraphicalPlane::new(v1,v0,0xFFCC88);
+        // let p0 = GraphicalPlane::new(v1,v0,0xFFCC88);
 
-        // // let p1 = Plane::new(v2,v3,0x3FDD88);
+        // // // let p1 = Plane::new(v2,v3,0x3FDD88);
 
-        elements.push(Box::new(p0));
+        // elements.push(Box::new(p0));
         // elements.push(Box::new(p1));
 
 

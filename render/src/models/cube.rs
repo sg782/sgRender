@@ -64,6 +64,107 @@ impl Cube{
 
         // left (right)
         faces.push(Face::new(
+            0,1,3, 
+            vertices[0].as_vec3(), 
+            vertices[1].as_vec3(), 
+            vertices[3].as_vec3()
+        ));
+        faces.push(Face::new(
+            0,3,2, 
+            vertices[0].as_vec3(), 
+            vertices[3].as_vec3(), 
+            vertices[2].as_vec3()
+        ));
+        
+
+        // top (back)
+        faces.push(Face::new(
+            1,5,7, 
+            vertices[1].as_vec3(), 
+            vertices[5].as_vec3(), 
+            vertices[7].as_vec3()
+        ));
+        faces.push(Face::new(
+            1,7,3, 
+            vertices[1].as_vec3(), 
+            vertices[7].as_vec3(), 
+            vertices[3].as_vec3()
+        ));
+        
+
+        // bottom (front)
+        faces.push(Face::new(
+            0,2,4, 
+            vertices[0].as_vec3(), 
+            vertices[2].as_vec3(), 
+            vertices[4].as_vec3()
+        ));
+        faces.push(Face::new(
+            2,6,4, 
+            vertices[2].as_vec3(), 
+            vertices[6].as_vec3(), 
+            vertices[4].as_vec3()
+        ));
+
+        
+        //right (left)
+        faces.push(Face::new(
+            4,6,5, 
+            vertices[4].as_vec3(), 
+            vertices[6].as_vec3(), 
+            vertices[5].as_vec3()
+        ));
+        faces.push(Face::new(
+            5,6,7, 
+            vertices[5].as_vec3(), 
+            vertices[6].as_vec3(), 
+            vertices[7].as_vec3()
+        ));
+
+
+
+        //front (bottom)
+        faces.push(Face::new(
+            2,3,7, 
+            vertices[2].as_vec3(), 
+            vertices[3].as_vec3(), 
+            vertices[7].as_vec3()
+        ));
+        faces.push(Face::new(
+            2,7,6, 
+            vertices[2].as_vec3(), 
+            vertices[7].as_vec3(), 
+            vertices[6].as_vec3()
+        ));
+
+        
+        //back (top)
+        faces.push(Face::new(
+            0,5,1, 
+            vertices[0].as_vec3(), 
+            vertices[5].as_vec3(), 
+            vertices[1].as_vec3()
+        ));
+        faces.push(Face::new(
+            0,4,5, 
+            vertices[0].as_vec3(), 
+            vertices[4].as_vec3(), 
+            vertices[5].as_vec3()
+        ));
+
+
+
+
+        
+
+        /*
+        Faces in counterclockwise order (opposite to as written above)
+        
+         */
+           // left (right)
+
+           /*
+        faces.push(Face::new(
             0,3,1, 
             vertices[0].as_vec3(), 
             vertices[3].as_vec3(), 
@@ -151,6 +252,10 @@ impl Cube{
             vertices[5].as_vec3(), 
             vertices[4].as_vec3()
         ));
+        
+        
+        */
+         
 
         
 
