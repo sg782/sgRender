@@ -3,6 +3,8 @@ use nalgebra::Vector3;
 
 use crate::mesh::mesh::Mesh;
 use crate::models::cube::Cube;
+use crate::models::rect_prism::RectPrism;
+
 use crate::models::graphical_plane::GraphicalPlane;
 
 use crate::models::imported::Imported;
@@ -54,6 +56,10 @@ impl World{
             }
         }
 
+
+        // let prism = RectPrism::new(0.,0.,0.,10.,2.,2.5, 0x00FF00);
+        // elements.push(Box::new(prism));
+
         //println!("NUM items; {}", count);
 
         // let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
@@ -73,9 +79,9 @@ impl World{
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer
         //https://www.gabrielgambetta.com/computer-graphics-from-scratch/03-light.html
         
-        let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
+        // let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
 
-        elements.push(Box::new(teapot));
+        // elements.push(Box::new(teapot));
         // let g: f32 = 1.22/2.;
         // let x_pt = g.tan();
 
