@@ -1,0 +1,35 @@
+#version 460
+
+
+// define each chunk to be 16x16
+layout(local_size_x = 256) in;
+
+layout(set = 0, binding = 0) buffer TileCounts {
+    uint data[];
+} tile_count_data;
+
+layout (set = 0, binding = 1) buffer RunningTileCount{
+    uint data[];
+} running_tile_count_data;
+
+
+void main() {
+
+    // parallel running sum algorithm
+    // https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
+
+    /*
+    as this seems like a minor pain to implement, i will wait until such optimization is necessary.
+    the algorithm is simple enough but i dont think i know enough about GPU programming just yet to do it without using le language model as a big crutch (not ideal, since this is for learning purposes)
+
+    */
+
+    uint idx = gl_GlobalInvocationID.x;
+
+
+    if(idx ==0){
+        running_tile_count_data.data[0] = 0;
+    }
+
+
+}

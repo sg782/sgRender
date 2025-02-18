@@ -7,17 +7,16 @@ use std::env;
 
 use crate::world::World;
 use crate::view::View;
-use crate::renderer::Renderer;
+use crate::render::renderer::Renderer;
 
 pub mod lighting;
-pub mod shaders;
 pub mod mesh;
 pub mod models;
 mod plane;
 pub mod primitives;
 mod world;
 mod view;
-mod renderer;
+mod render;
 
 const WIDTH: usize = 1200;
 const HEIGHT: usize = 600;

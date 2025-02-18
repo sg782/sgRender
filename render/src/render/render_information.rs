@@ -1,5 +1,14 @@
 use std::sync::Arc;
 
+use vulkano::VulkanLibrary;
+use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
+use vulkano::device::QueueFlags;
+use vulkano::device::{Features};
+
+use vulkano::device::{ DeviceCreateInfo, QueueCreateInfo};
+
+
+
 use vulkano::device::{Device, Queue};
 use vulkano::memory::allocator::{StandardMemoryAllocator};
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
@@ -24,7 +33,7 @@ pub struct RenderInformation {
     pub line_draw_compute_pipeline: Arc<ComputePipeline>,
     pub in_view_compute_pipeline: Arc<ComputePipeline>,
     pub triangle_draw_compute_pipeline: Arc<ComputePipeline>,
-    pub sort_faces_by_tile_compute_pipeline: Arc<ComputePipeline>,
+    pub sum_faces_by_tile_compute_pipeline: Arc<ComputePipeline>,
 
     pub work_group_counts: [u32;3],
 }
@@ -41,20 +50,66 @@ impl RenderInformation {
     }
 
 
+    pub fn new() -> Self {
 
+        let library = VulkanLibrary::new().expect("no local Vulkan library/DLL");
+        let instance = Instance::new(
+            library,
+            InstanceCreateInfo {
+                flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
+                ..Default::default()
+            },
+        )
+        .expect("failed to create instance");
+    
+    
+        let physical_device = instance
+            .enumerate_physical_devices()
+            .expect("could not enumerate devices")
+            .next()
+            .expect("no devices available");
+    
+        let queue_family_index = physical_device
+        .queue_family_properties()
+        .iter()
+        .enumerate()
+        .position(|(_queue_family_index, queue_family_properties)| {
+            queue_family_properties.queue_flags.contains(QueueFlags::GRAPHICS)
+        })
+        .expect("couldn't find a graphical queue family") as u32;
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+        let features = Features {
+            shader_float64: true, // Enable double-precision floating point support
+            ..Features::empty()    // Keep other features disabled unless needed
+        };
+        
+    
+        let (device, mut queues) = Device::new(
+            physical_device,
+            DeviceCreateInfo {
+                enabled_features: features,
+                // here we pass the desired queue family to use by index
+                queue_create_infos: vec![QueueCreateInfo {
+                    queue_family_index,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        )
+        .expect("failed to create device");
+    
+        let queue = queues.next().unwrap();
 
         // Memory Allocator (Reuse across frames)
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
 
         // Command Buffer Allocator (Reuse for submitting commands)
         let command_buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
-        
+
         let vertex_shader_path = "src/shaders/vertices.spv";
         let vertex_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &vertex_shader_path);
 
-        let line_draw_shader_path = "src/shaders/sort_faces_by_tile.spv";
+        let line_draw_shader_path = "src/shaders/line_draw.spv";
         let line_draw_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &line_draw_shader_path);
 
         let in_view_shader_path = "src/shaders/in_view.spv";
@@ -63,8 +118,14 @@ impl RenderInformation {
         let triangle_draw_shader_path = "src/shaders/triangle_draw.spv";
         let triangle_draw_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &triangle_draw_shader_path);
         
-        let sort_faces_by_tile_shader_path = "src/shaders/sort_faces_by_tile.spv";
-        let sort_faces_by_tile_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(),&sort_faces_by_tile_shader_path);
+        let sum_faces_by_tile_shader_path = "src/shaders/sum_face_intersections.spv";
+        let sum_faces_by_tile_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(),&sum_faces_by_tile_shader_path);
+
+        // let calculate_tile_offsets_shader_path = "";
+        // let calculate_tile_offsets_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(),&calculate_tile_offsets_shader_path);
+
+        // let sort_faces_by_tile_shader_path = "";
+        // let sort_faces_by_tile_compute_pipeline =  RenderInformation::create_compute_pipeline(device.clone(),&sort_faces_by_tile_shader_path);
 
 
         let work_group_counts = [8192,1,1];
@@ -79,7 +140,7 @@ impl RenderInformation {
             line_draw_compute_pipeline,
             in_view_compute_pipeline,
             triangle_draw_compute_pipeline,
-            sort_faces_by_tile_compute_pipeline,
+            sum_faces_by_tile_compute_pipeline,
             work_group_counts,
         }
     }

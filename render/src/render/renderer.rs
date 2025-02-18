@@ -18,6 +18,10 @@ use crate::primitives::triangle::Triangle;
 
 use std::time::Instant;
 
+use crate::render::buffers::Buffers;
+
+use crate::render::structures::{PushConstants,PushConstantsB,PushConstantsC,FrustumFaces, PushConstantsSortVertices};
+
 
 
 use nalgebra::Matrix4;
@@ -47,7 +51,7 @@ use vulkano::pipeline::PipelineBindPoint;
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::shaders::render_information::RenderInformation;
+use crate::render::render_information::RenderInformation;
 
 use vulkano::buffer::Subbuffer;
 
@@ -60,6 +64,8 @@ use vulkano::image::ImageType;
 use minifb::Window;
 
 use vulkano::device::{Features};
+
+use std::sync::Arc;
 
 // https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/?utm_source=chatgpt.com
 
@@ -77,96 +83,53 @@ RIGHT HANDED COORDINATE SYSTEM:
 
 */
 
-#[repr(C)]
-#[derive(Default, Copy, Clone, Pod, Zeroable)]
-pub struct Transformation {
-    pub transform_matrix: [[f32; 4]; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct BoundingPoint {
-    min: [f32 ; 3],
-    _pad1: f32,
-    max: [f32 ; 3],
-    _pad2: f32,
-
-}
-
-#[repr(C)] 
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-pub struct FrustumFaces {
-    faces: [[ f32; 4];6], // normal: Vec3<f32>, and Distance: f32
-}
-
-#[repr(C)] 
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct PushConstants {
-    a: f32,
-    b: f32,
-}
-
-#[repr(C)] 
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct PushConstantsB {
-    a: f32,
-    b: f32,
-    c: f32,
-}
-
-#[repr(C)] 
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-struct PushConstantsC {
-    screen_width: f32,
-    screen_height: f32,
-    heading_x: f32,
-    heading_y: f32, 
-    heading_z: f32,
-    x: f32, 
-    y: f32,
-    z: f32,
-}
 
 
 
-pub struct Buffers { 
+// pub struct Bufferss { 
 
-    // vertices
-    pub vertex_staging_buffer: Subbuffer<[[f32; 4]]>,
-    pub vertex_buffer: Subbuffer<[[f32; 4]]>,
-    pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
+//     // vertices
+//     pub vertex_staging_buffer: Subbuffer<[[f32; 4]]>,
+//     pub vertex_buffer: Subbuffer<[[f32; 4]]>,
+//     pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
     
-    pub unified_vertex_buffer:  Subbuffer<[[f32; 4]]>,
+//     pub unified_vertex_buffer:  Subbuffer<[[f32; 4]]>,
 
-    vertex_depth_buffer: Subbuffer<[f32]>,
+//     vertex_depth_buffer: Subbuffer<[f32]>,
 
-    // rotation transform
-    pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
-    pub transform_buffer: Subbuffer<Transformation>,
+//     // rotation transform
+//     pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
+//     pub transform_buffer: Subbuffer<Transformation>,
 
-    //faces_buffer
-    pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
-    pub face_buffer: Subbuffer<[[u32; 4]]>,
+//     //faces_buffer
+//     pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
+//     pub face_buffer: Subbuffer<[[u32; 4]]>,
 
-    pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
-    pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
+//     pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
+//     pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
 
-    pub color_staging_buffer: Subbuffer<[u32]>,
-    pub color_buffer: Subbuffer<[u32]>,
+//     pub color_staging_buffer: Subbuffer<[u32]>,
+//     pub color_buffer: Subbuffer<[u32]>,
 
-    // running vertices
-    pub running_vertice_staging_buffer: Subbuffer<[u32]>,
-    pub running_vertice_buffer: Subbuffer<[u32]>,
+//     // running vertices
+//     pub running_vertice_staging_buffer: Subbuffer<[u32]>,
+//     pub running_vertice_buffer: Subbuffer<[u32]>,
 
-    pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
-    pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
+//     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
+//     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
 
-    pub depth_staging_buffer: Subbuffer<[f32]>,
-    pub depth_buffer: Subbuffer<[f32]>,
+//     pub depth_staging_buffer: Subbuffer<[f32]>,
+//     pub depth_buffer: Subbuffer<[f32]>,
 
-    pub in_view_staging_buffer: Subbuffer<[u32]>,
-    pub in_view_buffer: Subbuffer<[u32]>,
+//     pub in_view_staging_buffer: Subbuffer<[u32]>,
+//     pub in_view_buffer: Subbuffer<[u32]>,
     
+// }
+
+pub struct DrawFacesInformation {
+    pub pixel_image: Arc<Image>,
+    pub pixel_image_view: Arc<ImageView>,
+    pub output_img_buf: Subbuffer<[u32]>,   
 }
 
 pub struct Renderer{
@@ -177,11 +140,11 @@ pub struct Renderer{
     pub frame_count: u64,
     pub screen_width: usize,
     pub screen_height: usize,
-
 }
 
-impl Renderer {
 
+
+impl Renderer {
 
 // pass render information in
 
@@ -189,491 +152,9 @@ impl Renderer {
 
         // I should organize this more
 
+        let render_information = RenderInformation::new();
 
-        let library = VulkanLibrary::new().expect("no local Vulkan library/DLL");
-        let instance = Instance::new(
-            library,
-            InstanceCreateInfo {
-                flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
-                ..Default::default()
-            },
-        )
-        .expect("failed to create instance");
-    
-    
-        let physical_device = instance
-            .enumerate_physical_devices()
-            .expect("could not enumerate devices")
-            .next()
-            .expect("no devices available");
-    
-        let queue_family_index = physical_device
-        .queue_family_properties()
-        .iter()
-        .enumerate()
-        .position(|(_queue_family_index, queue_family_properties)| {
-            queue_family_properties.queue_flags.contains(QueueFlags::GRAPHICS)
-        })
-        .expect("couldn't find a graphical queue family") as u32;
-
-        let features = Features {
-            shader_float64: true, // Enable double-precision floating point support
-            ..Features::empty()    // Keep other features disabled unless needed
-        };
-        
-    
-        let (device, mut queues) = Device::new(
-            physical_device,
-            DeviceCreateInfo {
-                enabled_features: features,
-                // here we pass the desired queue family to use by index
-                queue_create_infos: vec![QueueCreateInfo {
-                    queue_family_index,
-                    ..Default::default()
-                }],
-                ..Default::default()
-            },
-        )
-        .expect("failed to create device");
-    
-        let queue = queues.next().unwrap();
-
-        
-        let mut raw_vertex_data: Vec<Vector4<f32>> = Vec::new();
-        // put all vertex data into one list, and decompose afterward
-        for mesh in &world.elements {
-            for vertice in mesh.vertices(){
-                raw_vertex_data.push(vertice.position);
-            }
-        }
-    
-        let render_information = RenderInformation::new(device.clone(), queue.clone());
-
-
-
-        // create buffers
-        let buffer_size = (raw_vertex_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
-
-        let vertex_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            raw_vertex_data
-            .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-        let vertex_depth_buffer: Subbuffer<[f32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-
-        let unified_vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
-                ..Default::default()
-            },
-            raw_vertex_data.len() as u64, // Same size as vertex_buffer
-        ).expect("Failed to create vertex buffer!");
-        
-        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
-                ..Default::default()
-            },
-            (raw_vertex_data.len() * 3) as u64, // Same size as vertex_buffer
-        ).expect("Failed to create readback buffer!");
-        
-
-        //let mat = self.calculate_transformation().cast::<f32>();
-
-        let mat: Matrix4<f32> = Matrix4::zeros();
-
-
-        let transform_staging_buffer_1 = Buffer::from_data(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC, // UBO usage
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
-                ..Default::default()
-            },
-            Transformation {
-                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
-            },
-        ).expect("Failed to create uniform buffer");
-
-        
-        let transform_staging_buffer_2 = Buffer::from_data(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC, // UBO usage
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
-                ..Default::default()
-            },
-            Transformation {
-                transform_matrix: mat.into(), // Convert nalgebra Matrix4<f32> to [[f32; 4]; 4]
-            },
-        ).expect("Failed to create uniform buffer");
-
-
-        let transform_buffer: Subbuffer<Transformation> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            std::mem::size_of::<Transformation>() as u64
-        ).expect("Failed to create storage buffer!");
-        
-
-        let transform_staging_buffers = Vector2::new(
-            transform_staging_buffer_1,
-            transform_staging_buffer_2,
-        );
-
-
-
-        let mut face_data: Vec<Vector4<usize>> = Vec::new();
-        let mut face_normals: Vec<Vector3<f32>> = Vec::new();
-
-        for (i,mesh) in world.elements.iter().enumerate() {
-            for face in mesh.faces(){
-                face_data.push(Vector4::new(
-                    face.vertex_ids[0] as usize,
-                    face.vertex_ids[1] as usize, 
-                    face.vertex_ids[2] as usize, 
-                    i
-                ));
-                face_normals.push(face.normal);
-            }
-        }
-
-        let buffer_size: u64 = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
-
-        let face_staging_buffer: Subbuffer<[[u32; 4]]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            face_data
-            .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0] as u32, v[1] as u32, v[2] as u32, v[3] as u32]),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let face_buffer: Subbuffer<[[u32; 4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-        let buffer_size: u64 = (face_normals.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
-        let face_normal_staging_buffer: Subbuffer<[[f32;4]]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            face_normals
-            .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0], v[1], v[2], 0.]),
-        ).expect("failed to cretae staging buffer");
-
-        let face_normal_buffer: Subbuffer<[[f32;4]]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-        let mut color_data: Vec<u32> = Vec::new();
-        for mesh in &world.elements{
-            color_data.push(mesh.color());
-        }
-
-        let buffer_size: u64 = (color_data.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
-
-
-        let color_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            color_data
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let color_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-
-        let vertice_indices = &world.idx_vec_running;
-
-        let running_vertice_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            vertice_indices.iter().cloned(),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let running_vertice_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            vertice_indices.len() as u64,
-        ).expect("Failed to create storage buffer!");
-
-
-        let mut bounding_boxes: Vec<Vector2<Vector3<f32>>> = Vec::new();
-        for mesh in &world.elements {
-            bounding_boxes.push(*mesh.bounding_box());
-        }
-
-        let bounding_box_staging_buffer: Subbuffer<[BoundingPoint]> = Buffer::from_iter(
-            render_information.memory_allocator.clone(), 
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            }, 
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            }, 
-            bounding_boxes.iter().map(
-                |bb| BoundingPoint {
-                min: [bb[0][0], bb[0][1], bb[0][2]],
-                _pad1: 0.,
-                max: [bb[1][0], bb[1][1], bb[1][2]],
-                _pad2: 0.,
-                }
-            ),
-        ).expect("Failed to create buffer");
-
-        let bounding_box_buffer: Subbuffer<[BoundingPoint]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            std::mem::size_of::<BoundingPoint>() as u64 * bounding_boxes.len() as u64
-        ).expect("Failed to create storage buffer!");
-
-
-        let mut depth_vec: Vec<f32> = vec![-INFINITY; (screen_width * screen_height) as usize]; 
-        let buffer_size = (depth_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
-
-
-        let depth_staging_buffer: Subbuffer<[f32]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            depth_vec.iter().cloned(),
-
-        ).expect("failed to cretae depth buffer");
-
-                
-        let depth_buffer: Subbuffer<[f32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-        let in_vec = vec![0; vertice_indices.len()]; 
-
-
-
-        let in_view_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            in_vec.iter().cloned(),
-
-        ).expect("failed to cretae staging buffer");
-
-        
-        let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
-            render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            buffer_size
-        ).expect("Failed to create storage buffer!");
-
-
-
-        // buffer encapsulation struct
-        let buffers = Buffers {
-            vertex_staging_buffer,
-            vertex_buffer,
-            vertex_readback_buffer,
-
-            unified_vertex_buffer,
-
-            vertex_depth_buffer,
-
-            transform_buffer,
-            transform_staging_buffers,
-
-            face_staging_buffer,
-            face_buffer,
-
-            face_normal_staging_buffer,
-            face_normal_buffer,
-
-            color_staging_buffer,
-            color_buffer,
-            
-            running_vertice_staging_buffer,
-            running_vertice_buffer,
-
-            bounding_box_staging_buffer,
-            bounding_box_buffer,
-
-            depth_staging_buffer,
-            depth_buffer,
-
-            in_view_staging_buffer,
-            in_view_buffer,
-
-
-        };
-
-
+        let buffers = Buffers::new(&render_information, &world, screen_width, screen_height);
 
         let frame_count = 0;
 
@@ -688,10 +169,7 @@ impl Renderer {
         }
     }
 
-    pub fn calculate_tiles_per_face(&self, ){
-        let ids: Vec<Vec<u32>> = Vec::new();
 
-    }
 
     pub fn calculate_transformation(&self) -> Matrix4<f32>{
 
@@ -759,6 +237,7 @@ impl Renderer {
     pub fn render(& mut self, window: &mut Window){
         self.frame_count += 1;
 
+        //self.sort_faces_by_tiles();
         self.compute_vertex_screen_coordinates();
         self.draw_faces(window);
 
@@ -768,19 +247,180 @@ impl Renderer {
 
     }
 
-    fn sort_faces_into_tiles(&self){
+    fn sort_faces_by_tiles(&self){
+
+        let chunk_width: u32 = 128;
+        let num_chunks_x: u32 = (self.screen_width as f32 / chunk_width as f32).ceil() as u32;
+        let num_chunks_y: u32 = (self.screen_height as f32 / chunk_width as f32).ceil() as u32;
+
+        let buffer_length: u32 = num_chunks_x * num_chunks_y;
+
+
+        let buffer_size = (buffer_length * std::mem::size_of::<u32>() as u32) as u64; // Total buffer size in bytes
+
+    
+
+        let tile_counts_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            vec![0, buffer_length]
+
+        ).expect("failed to create staging buffer");
+
         
+        let tile_counts_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+        let tile_counts_readback_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create readback buffer!");
+        
+
+        let running_tile_counts_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+        let tile_ids_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+            self.render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            &self.render_information.command_buffer_allocator,
+            self.render_information.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+    
+
+        let descriptor_set_allocator =
+            StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
+    
+        let pipeline_layout = self.render_information.sum_faces_by_tile_compute_pipeline.layout();
+        let descriptor_set_layouts = pipeline_layout.set_layouts();
+
+  
+
+        let descriptor_set_layout_index = 0;
+        let descriptor_set_layout = descriptor_set_layouts
+            .get(descriptor_set_layout_index)
+            .unwrap();
+
+        let descriptor_set = PersistentDescriptorSet::new(
+            &descriptor_set_allocator,
+            descriptor_set_layout.clone(),
+            [
+                WriteDescriptorSet::buffer(0, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(1, tile_counts_buffer.clone()),
+                WriteDescriptorSet::buffer(2, tile_ids_buffer.clone()),
+                WriteDescriptorSet::buffer(3, self.buffers.face_buffer.clone()),
+                WriteDescriptorSet::buffer(4, self.buffers.running_vertice_buffer.clone()),
+                ], 
+            [],
+        )
+        .unwrap();
+
+
+        let push_constants = PushConstantsSortVertices {
+            a: num_chunks_x,
+            b: num_chunks_y,  
+            c: chunk_width,
+        };
+       
+       let copy_operations = [
+        CopyBufferInfo::buffers(tile_counts_staging_buffer.clone(), tile_counts_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.face_staging_buffer.clone(), self.buffers.face_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.running_vertice_staging_buffer.clone(), self.buffers.running_vertice_buffer.clone()),
+       ];
+
+       for copy_op in copy_operations{
+        command_buffer_builder.copy_buffer(copy_op).unwrap();
+       }
+
+    
+        command_buffer_builder
+            .push_constants(self.render_information.sum_faces_by_tile_compute_pipeline.layout().clone(), 0, push_constants)
+                .unwrap()
+            .bind_pipeline_compute(self.render_information.sum_faces_by_tile_compute_pipeline.clone())
+                .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                self.render_information.sum_faces_by_tile_compute_pipeline.layout().clone(),
+                descriptor_set_layout_index as u32,
+                descriptor_set,
+            )
+                .unwrap()
+
+            .dispatch(self.render_information.work_group_counts)
+                .unwrap();
+
+        let command_buffer = command_buffer_builder.build().unwrap();
+    
+        let future = sync::now(self.render_information.device.clone())
+        .then_execute(self.render_information.queue.clone(), command_buffer)
+            .unwrap()
+        .then_signal_fence_and_flush()
+            .unwrap();
+
+    
+        future.wait(None).unwrap();  // Ensures GPU completion before reading
+
+
     }
 
     fn compute_vertex_screen_coordinates (&self){ //} -> Vec<Vector4<f32>> 
 
 
 
-
         let mut write_lock = self.buffers.transform_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
         write_lock.transform_matrix = self.calculate_transformation().into();
 
-        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+        let mut command_buffer_builder: AutoCommandBufferBuilder<vulkano::command_buffer::PrimaryAutoCommandBuffer> = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
             self.render_information.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
@@ -828,6 +468,7 @@ impl Renderer {
             a: self.screen_width as f32,
             b: self.screen_height as f32,  
         };
+
        
     
         command_buffer_builder
@@ -853,6 +494,9 @@ impl Renderer {
 
         
         let command_buffer = command_buffer_builder.build().unwrap();
+
+
+
     
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
@@ -868,6 +512,8 @@ impl Renderer {
     // for v in content.iter(){
     //     println!("{:?}", v);
     // }
+
+
     
     }
 
@@ -1010,6 +656,12 @@ impl Renderer {
 
     fn calculate_in_view(&self){ //} -> Vec<u32>{
 
+        // let now = Instant::now();
+        // let elapsed = now.elapsed().as_nanos();
+
+        // println!("Time elapsed in compute vertex_ {}", elapsed);
+
+
         let frustum_faces = &self.view.frustum_faces;
 
         let frustum_faces_staging_buffer:Subbuffer<FrustumFaces> = Buffer::from_data(
@@ -1098,6 +750,8 @@ impl Renderer {
 
 
         let command_buffer = command_buffer_builder.build().unwrap();
+
+
     
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
@@ -1111,6 +765,9 @@ impl Renderer {
 
 
     fn draw_faces(&self, window: &mut Window){
+
+
+
 
 
         let pixel_image = Image::new(
@@ -1145,7 +802,11 @@ impl Renderer {
             pixel_image_size as u64, // Corrected buffer size
         ).expect("Failed to create readback buffer!");
 
+
+
         self.calculate_in_view();
+
+
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
@@ -1237,6 +898,7 @@ impl Renderer {
     
 
 
+
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
             .unwrap()
@@ -1247,10 +909,10 @@ impl Renderer {
         future.wait(None).unwrap();  // Ensures GPU completion before reading
 
 
+
         let content = output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
-
 
     }
 }

@@ -71,7 +71,9 @@ void main() {
     // populate tile chunks
     for(uint i=max(0,min_grid_y);i<=min(push.num_chunks_y,max_grid_y);i++){
         for(uint j = max(0,min_grid_x); j<=min(push.num_chunks_x,max_grid_x); j++){
-            tile_count_data.data[i * push.num_chunks_x + j] += 1;
+
+            // atomic add
+            atomicAdd(tile_count_data.data[i * push.num_chunks_x + j],1);
         }
     }
 
