@@ -28,10 +28,10 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        let side_length = 4.;
-        let amount_wide = 10;
-        let amount_high = 10;
-        let amount_deep = 10;
+        let side_length = 2.;
+        let amount_wide = 1;
+        let amount_high = 1;
+        let amount_deep = 100;
         let spacing = 4.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{
@@ -42,7 +42,7 @@ impl World{
                     let jdx = j as f32;
                     let kdx = k as f32;
                     let r = 4.* (4.1+kdx);
-                    //let cube = Cube::new(r * (count/300.).sin() ,r * (count/200.).cos(), count / 5. ,side_length, 0xA028 * count as u32);
+                    //let cube = Cube::new(r * idx,jdx * jdx, r * kdx, side_length, 0xA028 * count as u32);
                     let cube = Cube::new(idx * (side_length + spacing),jdx * (side_length + spacing), kdx * (side_length + spacing), side_length-1., 0xC028 * count as u32);
 
                     // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
@@ -65,12 +65,12 @@ impl World{
         // let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
         // let v1: Vector3<f32> = Vector3::new(30.,50.,6.);
 
-        // // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
-        // // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
+        // // // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
+        // // // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
 
         // let p0 = GraphicalPlane::new(v1,v0,0xFFCC88);
 
-        // // // let p1 = Plane::new(v2,v3,0x3FDD88);
+        // // // // // let p1 = Plane::new(v2,v3,0x3FDD88);
 
         // elements.push(Box::new(p0));
         // elements.push(Box::new(p1));
@@ -80,8 +80,12 @@ impl World{
         //https://www.gabrielgambetta.com/computer-graphics-from-scratch/03-light.html
         
         // let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
-
+        
         // elements.push(Box::new(teapot));
+
+        // let sphere = Imported::new("../../3d_models/sphere/source/Archive/sphere.obj",10.,0.,0.,0.);
+        // elements.push(Box::new(sphere));
+
         // let g: f32 = 1.22/2.;
         // let x_pt = g.tan();
 

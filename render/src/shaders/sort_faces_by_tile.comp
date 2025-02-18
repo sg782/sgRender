@@ -1,0 +1,79 @@
+#version 460
+
+
+// define each chunk to be 16x16
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(push_constant) uniform PushConstants {
+    uint num_chunks_x;
+    uint num_chunks_y;
+    uint chunk_width; // should be equal to local_size_x (and local_Size_y)
+
+} push;
+
+
+layout(set = 0, binding = 0) buffer VertexData {
+    vec4 data[];
+} vertex_data;
+
+layout (set = 0, binding = 1) buffer TileCounts{
+    uint data[];
+} tile_count_data;
+
+layout (set = 0, binding = 2) buffer TileFaceIds {
+    uint data[];
+} tile_face_ids;
+
+layout(set = 0, binding = 3) buffer Faces {
+    // first 3 values are vertex indices (relative to mesh), 
+    // last value is the idx of the mesh
+    uvec4 ids[];
+} faces;
+
+layout(set = 0, binding = 4) buffer RunningVerticeCount{
+    uint data[];
+} running_vertice_count;
+
+
+void main() {
+
+    uint idx = gl_GlobalInvocationID.x;
+    uint idy = gl_GlobalInvocationID.y;
+
+    uint id = idx * gl_WorkGroupSize.x * idy;
+
+    vec4 d = vertex_data.data[0];
+    uint f = tile_count_data.data[0];
+    uint b = tile_face_ids.data[1];
+
+    uvec4 face = faces.ids[id]; // get face
+
+    uint v_0_idx = face[0] + running_vertice_count.data[face[3]];
+    uint v_1_idx = face[1] + running_vertice_count.data[face[3]];
+    uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
+
+    vec4 v0 = vertex_data.data[v_0_idx];
+    vec4 v1 = vertex_data.data[v_1_idx];
+    vec4 v2 = vertex_data.data[v_2_idx];
+
+    highp float min_x = min(v0[0],min(v1[0],v2[0]));
+    highp float max_x = max(v0[0],max(v1[0],v2[0]));
+
+    highp float min_y = min(v0[1],min(v1[1],v2[1]));
+    highp float max_y = max(v0[1],max(v1[1],v2[1]));
+
+    uint min_grid_x = uint((min_x / push.chunk_width)-0.5);
+    uint max_grid_x = uint ((max_x / push.chunk_width)+0.5);
+
+    uint min_grid_y = uint((min_y / push.chunk_width)-0.5);
+    uint max_grid_y = uint ((max_y / push.chunk_width)+0.5);
+
+    // populate tile chunks
+    for(uint i=max(0,min_grid_y);i<=min(push.num_chunks_y,max_grid_y);i++){
+        for(uint j = max(0,min_grid_x); j<=min(push.num_chunks_x,max_grid_x); j++){
+            tile_count_data.data[i * push.num_chunks_x + j] += 1;
+        }
+    }
+
+    
+}

@@ -61,7 +61,7 @@ use minifb::Window;
 
 use vulkano::device::{Features};
 
-
+// https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/?utm_source=chatgpt.com
 
 
 use vulkano::image::{Image, ImageUsage, view::ImageView};
@@ -119,9 +119,9 @@ struct PushConstantsB {
 struct PushConstantsC {
     screen_width: f32,
     screen_height: f32,
-    roll: f32,
-    pitch: f32, 
-    yaw: f32,
+    heading_x: f32,
+    heading_y: f32, 
+    heading_z: f32,
     x: f32, 
     y: f32,
     z: f32,
@@ -135,6 +135,8 @@ pub struct Buffers {
     pub vertex_staging_buffer: Subbuffer<[[f32; 4]]>,
     pub vertex_buffer: Subbuffer<[[f32; 4]]>,
     pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
+    
+    pub unified_vertex_buffer:  Subbuffer<[[f32; 4]]>,
 
     vertex_depth_buffer: Subbuffer<[f32]>,
 
@@ -297,7 +299,7 @@ impl Renderer {
 
 
 
-        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+        let unified_vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
@@ -308,9 +310,21 @@ impl Renderer {
                 ..Default::default()
             },
             raw_vertex_data.len() as u64, // Same size as vertex_buffer
+        ).expect("Failed to create vertex buffer!");
+        
+        let vertex_readback_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE, // CPU-readable
+                ..Default::default()
+            },
+            (raw_vertex_data.len() * 3) as u64, // Same size as vertex_buffer
         ).expect("Failed to create readback buffer!");
         
-
 
         //let mat = self.calculate_transformation().cast::<f32>();
 
@@ -628,6 +642,8 @@ impl Renderer {
             vertex_buffer,
             vertex_readback_buffer,
 
+            unified_vertex_buffer,
+
             vertex_depth_buffer,
 
             transform_buffer,
@@ -752,6 +768,10 @@ impl Renderer {
 
     }
 
+    fn sort_faces_into_tiles(&self){
+        
+    }
+
     fn compute_vertex_screen_coordinates (&self){ //} -> Vec<Vector4<f32>> 
 
 
@@ -826,10 +846,8 @@ impl Renderer {
             )
             .unwrap()
             .dispatch(self.render_information.work_group_counts)
-            .unwrap();
-
-            // .copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
-            // .unwrap();
+            .unwrap().copy_buffer(CopyBufferInfo::buffers(self.buffers.vertex_buffer.clone(), self.buffers.vertex_readback_buffer.clone())) // Copy back to CPU
+                .unwrap();
 
 
 
@@ -1170,9 +1188,9 @@ impl Renderer {
         let push_constants = PushConstantsC {
             screen_width: self.screen_width as f32,
             screen_height: self.screen_height as f32,
-            roll: self.view.roll,
-            pitch: self.view.pitch,
-            yaw: self.view.yaw,
+            heading_x: self.view.direction[0],
+            heading_y: self.view.direction[1],
+            heading_z: self.view.direction[2],
             x: self.view.x,
             y: self.view.y,
             z: self.view.z,

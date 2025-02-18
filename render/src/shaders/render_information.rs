@@ -24,6 +24,8 @@ pub struct RenderInformation {
     pub line_draw_compute_pipeline: Arc<ComputePipeline>,
     pub in_view_compute_pipeline: Arc<ComputePipeline>,
     pub triangle_draw_compute_pipeline: Arc<ComputePipeline>,
+    pub sort_faces_by_tile_compute_pipeline: Arc<ComputePipeline>,
+
     pub work_group_counts: [u32;3],
 }
 
@@ -39,9 +41,6 @@ impl RenderInformation {
     }
 
 
-    pub fn fill_vertex_buffer(&self) {
-        
-    }
 
 
     pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
@@ -51,98 +50,21 @@ impl RenderInformation {
 
         // Command Buffer Allocator (Reuse for submitting commands)
         let command_buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
-
-        // Create Buffer (Keep the same buffer across frames)
-
-        let vertex_shader = RenderInformation::load_shader(device.clone(), "src/shaders/vertices.spv");
-        let vertex_entry_point = vertex_shader.entry_point("main").unwrap();
-        let stage = PipelineShaderStageCreateInfo::new(vertex_entry_point);
-        let layout = PipelineLayout::new(
-            device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
-                .into_pipeline_layout_create_info(device.clone())
-                .unwrap()
-        )
-        .unwrap();
-
-        let vertex_compute_pipeline = ComputePipeline::new(
-            device.clone(),
-            None,
-            ComputePipelineCreateInfo::stage_layout(stage, layout),
-        )
-        .expect("failed to create compute pipeline");
-
-
-        let line_draw_shader = RenderInformation::load_shader(device.clone(), "src/shaders/line_draw.spv");
-        let line_draw_entry_point = line_draw_shader.entry_point("main").unwrap();
-        let line_stage = PipelineShaderStageCreateInfo::new(line_draw_entry_point);
-
-
         
+        let vertex_shader_path = "src/shaders/vertices.spv";
+        let vertex_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &vertex_shader_path);
 
-        let line_layout = PipelineLayout::new(
-            device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&line_stage])
-                .into_pipeline_layout_create_info(device.clone())
-                .unwrap()
-        )
-        .unwrap();
+        let line_draw_shader_path = "src/shaders/sort_faces_by_tile.spv";
+        let line_draw_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &line_draw_shader_path);
 
+        let in_view_shader_path = "src/shaders/in_view.spv";
+        let in_view_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), in_view_shader_path);
 
-
-        let line_draw_compute_pipeline = ComputePipeline::new(
-            device.clone(),
-            None,
-            ComputePipelineCreateInfo::stage_layout(line_stage, line_layout),
-        )
-        .expect("failed to create compute pipeline");
-
-
-        let in_view_shader = RenderInformation::load_shader(device.clone(), "src/shaders/in_view.spv");
-        let in_view_entry_point = in_view_shader.entry_point("main").unwrap();
-        let in_view_stage = PipelineShaderStageCreateInfo::new(in_view_entry_point);
-
-
+        let triangle_draw_shader_path = "src/shaders/triangle_draw.spv";
+        let triangle_draw_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &triangle_draw_shader_path);
         
-
-        let in_view_layout = PipelineLayout::new(
-            device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&in_view_stage])
-                .into_pipeline_layout_create_info(device.clone())
-                .unwrap()
-        )
-        .unwrap();
-
-
-        let in_view_compute_pipeline = ComputePipeline::new(
-            device.clone(),
-            None,
-            ComputePipelineCreateInfo::stage_layout(in_view_stage, in_view_layout),
-        )
-        .expect("failed to create compute pipeline");
-
-
-        let triangle_draw_shader = RenderInformation::load_shader(device.clone(), "src/shaders/triangle_draw.spv");
-        let triangle_draw_entry_point = triangle_draw_shader.entry_point("main").unwrap();
-        let triangle_draw_stage = PipelineShaderStageCreateInfo::new(triangle_draw_entry_point);
-
-
-        let triangle_draw_layout = PipelineLayout::new(
-            device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages([&triangle_draw_stage])
-                .into_pipeline_layout_create_info(device.clone())
-                .unwrap()
-        )
-        .unwrap();
-
-
-
-        let triangle_draw_compute_pipeline = ComputePipeline::new(
-            device.clone(),
-            None,
-            ComputePipelineCreateInfo::stage_layout(triangle_draw_stage, triangle_draw_layout),
-        )
-        .expect("failed to create compute pipeline");
+        let sort_faces_by_tile_shader_path = "src/shaders/sort_faces_by_tile.spv";
+        let sort_faces_by_tile_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(),&sort_faces_by_tile_shader_path);
 
 
         let work_group_counts = [8192,1,1];
@@ -157,8 +79,34 @@ impl RenderInformation {
             line_draw_compute_pipeline,
             in_view_compute_pipeline,
             triangle_draw_compute_pipeline,
+            sort_faces_by_tile_compute_pipeline,
             work_group_counts,
         }
+    }
+
+    fn create_compute_pipeline(device: Arc<Device>, path: &str) -> Arc<ComputePipeline>{
+        let shader = RenderInformation::load_shader(device.clone(), path);
+        let entry_point = shader.entry_point("main").unwrap();
+        let stage = PipelineShaderStageCreateInfo::new(entry_point);
+
+
+        let layout = PipelineLayout::new(
+            device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+                .into_pipeline_layout_create_info(device.clone())
+                .unwrap()
+        )
+        .unwrap();
+
+        let compute_pipeline = ComputePipeline::new(
+            device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(stage, layout),
+        )
+        .expect("failed to create compute pipeline");
+
+       compute_pipeline
+
     }
 
 }
