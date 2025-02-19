@@ -48,7 +48,8 @@ layout(set = 0, binding = 3) buffer VertexData {
 } vertex_data;
 
 layout(set = 0, binding = 4) buffer DepthBuffer {
-    highp float data[];
+    // highp float data[];
+    uint data[];
 } depth_buffer;
 
 layout(set = 0, binding = 5) buffer ColorBuffer {
@@ -190,18 +191,38 @@ void draw_full_half_space_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, high
 
             highp float intermediate_depth = v0[3] + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
 
+
+            /*
+            CURRENTLY CONVERTING TO ATOMIC
+
+
+            */
+
          
             // race condition causes severe flickering
-            if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
-                continue;
-            }else{
-                depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
-            }
 
-            vec4 to_write = color / 255;
-            to_write *= light_intensity;
+            // CHANGE: do this operation atomically, then atomically check if depth_buf.depth[id] == intermediate_depth, when drawing
+
+            atomicMin(depth_buffer.data[int_i * int(push.screen_width) + int_j], floatBitsToUint(intermediate_depth));
+            // if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
+            //     continue;
+            // }else{
+            //     depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
+            // }
+
+            if (depth_buffer.data[int_i * int(push.screen_width) + int_j] == floatBitsToUint(intermediate_depth)){
+                            vec4 to_write = color / 255;
+
+                            to_write *= light_intensity;
             ivec2 coord = ivec2(int_j,int_i);
             imageStore(img, coord, to_write);   
+                continue;
+            }
+            
+            // vec4 to_write = color / 255;
+            // to_write *= light_intensity;
+            // ivec2 coord = ivec2(int_j,int_i);
+            // imageStore(img, coord, to_write);   
             // ivec2 coord2 = ivec2(int_j,int_i+1);
             // imageStore(img, coord2, to_write);   
             // ivec2 coord3 = ivec2(int_j+1,int_i);

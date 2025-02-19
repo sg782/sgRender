@@ -1,6 +1,3 @@
-use std::f32::INFINITY;
-use std::ops::Sub;
-
 use crate::world::World;
 use crate::view::View;
 use nalgebra::Vector2;
@@ -12,9 +9,6 @@ use crate::mesh::mesh::Mesh;
 use vulkano::command_buffer::ClearColorImageInfo;
 use vulkano::format::ClearColorValue;
 
-use crate::primitives::line::Line;
-
-use crate::primitives::triangle::Triangle;
 
 use std::time::Instant;
 
@@ -27,12 +21,6 @@ use crate::render::structures::{PushConstants,PushConstantsB,PushConstantsC,Frus
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
 
-
-use vulkano::VulkanLibrary;
-use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
-use vulkano::device::QueueFlags;
-
-use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 
 
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
@@ -49,13 +37,12 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::pipeline::PipelineBindPoint;
 
-use bytemuck::{Pod, Zeroable};
+
 
 use crate::render::render_information::RenderInformation;
 
 use vulkano::buffer::Subbuffer;
 
-use num_cpus;
 use vulkano::command_buffer::CopyImageToBufferInfo;
 
 
@@ -63,7 +50,6 @@ use vulkano::image::ImageType;
 
 use minifb::Window;
 
-use vulkano::device::{Features};
 
 use std::sync::Arc;
 
@@ -150,9 +136,11 @@ impl Renderer {
 
     pub fn new(world: World, view: View, screen_width: usize, screen_height: usize) -> Renderer{
 
+
         // I should organize this more
 
         let render_information = RenderInformation::new();
+
 
         let buffers = Buffers::new(&render_information, &world, screen_width, screen_height);
 
@@ -174,7 +162,6 @@ impl Renderer {
     pub fn calculate_transformation(&self) -> Matrix4<f32>{
 
         let near = self.view.near;
-
         let far = self.view.far; // operates as a max render distance
 
 
@@ -429,15 +416,12 @@ impl Renderer {
     
 
 
-
         let descriptor_set_allocator =
             StandardDescriptorSetAllocator::new(self.render_information.device.clone(), Default::default());
     
         let pipeline_layout = self.render_information.vertex_compute_pipeline.layout();
         let descriptor_set_layouts = pipeline_layout.set_layouts();
     
-  
-
 
         let descriptor_set_layout_index = 0;
         let descriptor_set_layout = descriptor_set_layouts
@@ -491,13 +475,8 @@ impl Renderer {
                 .unwrap();
 
 
-
-        
         let command_buffer = command_buffer_builder.build().unwrap();
 
-
-
-    
         let future = sync::now(self.render_information.device.clone())
         .then_execute(self.render_information.queue.clone(), command_buffer)
         .unwrap()
@@ -768,42 +747,6 @@ impl Renderer {
 
 
 
-
-
-        let pixel_image = Image::new(
-            self.render_information.memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: Format::R8G8B8A8_UNORM,
-                extent: [self.screen_width as u32,self.screen_height as u32, 1],
-                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        
-        let pixel_image_view = ImageView::new_default(pixel_image.clone()).unwrap();
-
-        let pixel_image_size = self.screen_width * self.screen_height * 4; // RGBA, 4 bytes per pixel
-        let output_img_buf: Subbuffer<[u32]> = Buffer::new_slice(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC, // Can be read and transferred
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_RANDOM_ACCESS,
-                ..Default::default()
-            },
-            pixel_image_size as u64, // Corrected buffer size
-        ).expect("Failed to create readback buffer!");
-
-
-
         self.calculate_in_view();
 
 
@@ -840,7 +783,7 @@ impl Renderer {
                 WriteDescriptorSet::buffer(4, self.buffers.depth_buffer.clone()),
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
                 WriteDescriptorSet::buffer(6, self.buffers.face_normal_buffer.clone()),
-                WriteDescriptorSet::image_view(7, pixel_image_view.clone()),
+                WriteDescriptorSet::image_view(7, self.buffers.pixel_image_view.clone()),
                 ], 
             [],
         )
@@ -884,14 +827,14 @@ impl Renderer {
                 .unwrap()
             .clear_color_image(ClearColorImageInfo {
                 clear_value: ClearColorValue::Float([0.5, 0.5, 0.5, 1.0]),
-                ..ClearColorImageInfo::image(pixel_image.clone())
+                ..ClearColorImageInfo::image(self.buffers.pixel_image.clone())
             })
                 .unwrap()
             .dispatch(self.render_information.work_group_counts)
                 .unwrap()
             .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
-                pixel_image.clone(),
-                output_img_buf.clone(),
+                self.buffers.pixel_image.clone(),
+                self.buffers.output_img_buf.clone(),
             ))
             .unwrap();
         let command_buffer = command_buffer_builder.build().unwrap();
@@ -910,7 +853,7 @@ impl Renderer {
 
 
 
-        let content = output_img_buf.read().unwrap();
+        let content = self.buffers.output_img_buf.read().unwrap();
 
         window.update_with_buffer(&content, self.screen_width, self.screen_height).unwrap();
 

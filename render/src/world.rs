@@ -28,10 +28,10 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        let side_length = 2.;
-        let amount_wide = 1;
-        let amount_high = 1;
-        let amount_deep = 100;
+        let side_length = 5.;
+        let amount_wide = 10;
+        let amount_high = 10;
+        let amount_deep = 10;
         let spacing = 4.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{

@@ -4,8 +4,13 @@ use crate::render::structures::{Transformation, BoundingPoint};
 
 use std::f32::INFINITY;
 
+use vulkano::image::{Image, ImageUsage, view::ImageView};
+use vulkano::format::Format;
+
 use crate::world::World;
 use nalgebra::Vector3;
+
+use std::sync::Arc;
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
@@ -15,6 +20,11 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 
 
 use crate::render::render_information::RenderInformation;
+
+use vulkano::image::ImageCreateInfo;
+
+use vulkano::image::ImageType;
+
 
 /*
 Struct that holds all the relevant buffers that we need
@@ -55,11 +65,15 @@ pub struct Buffers {
     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
 
-    pub depth_staging_buffer: Subbuffer<[f32]>,
-    pub depth_buffer: Subbuffer<[f32]>,
+    pub depth_staging_buffer: Subbuffer<[u32]>,
+    pub depth_buffer: Subbuffer<[u32]>,
 
     pub in_view_staging_buffer: Subbuffer<[u32]>,
     pub in_view_buffer: Subbuffer<[u32]>,
+
+    pub pixel_image: Arc<Image>,
+    pub pixel_image_view: Arc<ImageView>,
+    pub output_img_buf: Subbuffer<[u32]>,
     
 }
 
@@ -392,11 +406,15 @@ impl Buffers {
         ).expect("Failed to create storage buffer!");
 
 
+
         let mut depth_vec: Vec<f32> = vec![-INFINITY; (screen_width * screen_height) as usize]; 
+
+        let mut depth_vec_a: Vec<u32> = vec![u32::MAX; (screen_width * screen_height) as usize];
+
         let buffer_size = (depth_vec.len() * std::mem::size_of::<u32>()) as u64; // Total buffer size in bytes
 
 
-        let depth_staging_buffer: Subbuffer<[f32]> = Buffer::from_iter( 
+        let depth_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
@@ -406,12 +424,12 @@ impl Buffers {
                 memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            depth_vec.iter().cloned(),
+            depth_vec_a.iter().cloned(),
 
         ).expect("failed to cretae depth buffer");
 
                 
-        let depth_buffer: Subbuffer<[f32]> = Buffer::new_unsized(
+        let depth_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
@@ -458,6 +476,39 @@ impl Buffers {
         ).expect("Failed to create storage buffer!");
 
 
+        let pixel_image = Image::new(
+            render_information.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: Format::R8G8B8A8_UNORM,
+                extent: [screen_width as u32,screen_height as u32, 1],
+                usage: ImageUsage::STORAGE | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        
+        let pixel_image_view = ImageView::new_default(pixel_image.clone()).unwrap();
+
+        let pixel_image_size = screen_width * screen_height * 4; // RGBA, 4 bytes per pixel
+        let output_img_buf: Subbuffer<[u32]> = Buffer::new_slice(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC, // Can be read and transferred
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_RANDOM_ACCESS,
+                ..Default::default()
+            },
+            pixel_image_size as u64, // Corrected buffer size
+        ).expect("Failed to create readback buffer!");
+
+
 
         // buffer encapsulation struct
         let buffers = Buffers {
@@ -492,6 +543,10 @@ impl Buffers {
 
             in_view_staging_buffer,
             in_view_buffer,
+
+            pixel_image,
+            pixel_image_view,
+            output_img_buf,
 
 
         };
