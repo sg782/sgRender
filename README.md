@@ -1,4 +1,4 @@
 # sgRender
-3d voxel renderer in rust for learning purposes
+3d renderer in rust for learning purposes
 
-I have never used rust so this may take some time
+frustrating how much boilerplate seems to be needed for GPU acceleration
