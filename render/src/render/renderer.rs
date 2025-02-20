@@ -80,6 +80,7 @@ pub struct Renderer{
     pub frame_count: u64,
     pub screen_width: usize,
     pub screen_height: usize,
+    pub is_drawing_faces: bool,
 }
 
 
@@ -100,6 +101,8 @@ impl Renderer {
 
         let frame_count = 0;
 
+        let is_drawing_faces = true;
+
         Renderer{
             world,
             view,
@@ -108,6 +111,7 @@ impl Renderer {
             frame_count,
             screen_width,
             screen_height,
+            is_drawing_faces,
         }
     }
 
@@ -178,12 +182,15 @@ impl Renderer {
     pub fn render(& mut self, window: &mut Window){
         self.frame_count += 1;
 
-        //self.sort_faces_by_tiles();
+        self.sort_faces_by_tiles();
         self.compute_vertex_screen_coordinates();
-        self.draw_faces(window);
 
+        if(self.is_drawing_faces){
+            self.draw_faces(window);
+        }else{
+            self.draw_wireframe(window);
+        }
 
-        //self.draw_wireframe(window);
 
 
     }
@@ -296,7 +303,7 @@ impl Renderer {
             &descriptor_set_allocator,
             descriptor_set_layout.clone(),
             [
-                WriteDescriptorSet::buffer(0, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(0, self.buffers.transformed_vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(1, tile_counts_buffer.clone()),
                 WriteDescriptorSet::buffer(2, tile_ids_buffer.clone()),
                 WriteDescriptorSet::buffer(3, self.buffers.face_buffer.clone()),
@@ -519,7 +526,7 @@ impl Renderer {
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
                 WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
-                WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(3, self.buffers.transformed_vertex_buffer.clone()),
                 WriteDescriptorSet::image_view(4, image_view.clone()),
 
                 ], 
@@ -558,7 +565,7 @@ impl Renderer {
             )
                 .unwrap()
             .clear_color_image(ClearColorImageInfo {
-                clear_value: ClearColorValue::Float([0.0, 0.0, 0.0, 1.0]),
+                clear_value: ClearColorValue::Float([0.98, 0.94, 0.82, 1.0]),
                 ..ClearColorImageInfo::image(image.clone())
             })
                 .unwrap()
@@ -783,7 +790,7 @@ impl Renderer {
             )
                 .unwrap()
             .clear_color_image(ClearColorImageInfo {
-                clear_value: ClearColorValue::Float([0.5, 0.5, 0.5, 1.0]),
+                clear_value: ClearColorValue::Float([0.98, 0.94, 0.82, 1.0]),
                 ..ClearColorImageInfo::image(self.buffers.pixel_image.clone())
             })
                 .unwrap()

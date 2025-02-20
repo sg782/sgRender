@@ -208,21 +208,23 @@ void draw_full_half_space_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, high
             // CHANGE: do this operation atomically, then atomically check if depth_buf.depth[id] == intermediate_depth, when drawing
             // reduces framerate quite a bit, but produces a better output
 
-            atomicMin(depth_buffer.data[int_i * int(push.screen_width) + int_j], floatBitsToUint(intermediate_depth));
-            // if(depth_buffer.data[int_i * int(push.screen_width) + int_j] > intermediate_depth){
+            // if(depth_buffer.data[int_i * int(push.screen_width) + int_j] < floatBitsToUint(intermediate_depth)){
             //     continue;
             // }else{
-            //     depth_buffer.data[int_i * int(push.screen_width) + int_j] = intermediate_depth;
+            //     depth_buffer.data[int_i * int(push.screen_width) + int_j] = floatBitsToUint(intermediate_depth);
             // }
 
-            if (depth_buffer.data[int_i * int(push.screen_width) + int_j] == floatBitsToUint(intermediate_depth)){
-                            vec4 to_write = color / 255;
+            
+            atomicMin(depth_buffer.data[int_i * int(push.screen_width) + int_j], floatBitsToUint(intermediate_depth));
 
-                            to_write *= light_intensity;
+            if (depth_buffer.data[int_i * int(push.screen_width) + int_j] == floatBitsToUint(intermediate_depth)){
+            vec4 to_write = color / 255;
+            to_write *= light_intensity;
             ivec2 coord = ivec2(int_j,int_i);
             imageStore(img, coord, to_write);   
                 continue;
             }
+            
             
             // vec4 to_write = color / 255;
             // to_write *= light_intensity;

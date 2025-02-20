@@ -29,9 +29,9 @@ impl World{
 
         // //test with a row of cubes
         let side_length = 5.;
-        let amount_wide = 40;
-        let amount_high = 40;
-        let amount_deep = 40;
+        let amount_wide = 3;
+        let amount_high = 3;
+        let amount_deep = 3;
         let spacing = 4.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{

@@ -65,7 +65,7 @@ fn main() {
 
     env::set_var("RUST_BACKTRACE", "1");
 
-    let view = View::new(-100.,-100.,75.,0.,0.,0.,1., WIDTH, HEIGHT);
+    let view = View::new(-10.,-10.,75.,0.,0.,0.,1., WIDTH, HEIGHT);
     let world = World::new();
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
 
@@ -108,6 +108,8 @@ fn main() {
                 renderer.view.rotate_pitch(-rotation_val);
             }else if window.is_key_down(Key::Z){
                 renderer.view.rotate_yaw(-rotation_val);
+            }else if window.is_key_down(Key::P){
+                renderer.is_drawing_faces = true;
             }
         }else{
             if window.is_key_down(Key::W){
@@ -135,6 +137,8 @@ fn main() {
                 renderer.view.rotate_pitch(rotation_val);
             }else if window.is_key_down(Key::Z){
                 renderer.view.rotate_yaw(rotation_val);
+            }else if window.is_key_down(Key::P){
+                renderer.is_drawing_faces = false;
             }
         }
 
