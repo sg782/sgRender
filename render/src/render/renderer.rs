@@ -72,52 +72,6 @@ RIGHT HANDED COORDINATE SYSTEM:
 
 
 
-// pub struct Bufferss { 
-
-//     // vertices
-//     pub vertex_staging_buffer: Subbuffer<[[f32; 4]]>,
-//     pub vertex_buffer: Subbuffer<[[f32; 4]]>,
-//     pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
-    
-//     pub unified_vertex_buffer:  Subbuffer<[[f32; 4]]>,
-
-//     vertex_depth_buffer: Subbuffer<[f32]>,
-
-//     // rotation transform
-//     pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
-//     pub transform_buffer: Subbuffer<Transformation>,
-
-//     //faces_buffer
-//     pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
-//     pub face_buffer: Subbuffer<[[u32; 4]]>,
-
-//     pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
-//     pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
-
-//     pub color_staging_buffer: Subbuffer<[u32]>,
-//     pub color_buffer: Subbuffer<[u32]>,
-
-//     // running vertices
-//     pub running_vertice_staging_buffer: Subbuffer<[u32]>,
-//     pub running_vertice_buffer: Subbuffer<[u32]>,
-
-//     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
-//     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
-
-//     pub depth_staging_buffer: Subbuffer<[f32]>,
-//     pub depth_buffer: Subbuffer<[f32]>,
-
-//     pub in_view_staging_buffer: Subbuffer<[u32]>,
-//     pub in_view_buffer: Subbuffer<[u32]>,
-    
-// }
-
-pub struct DrawFacesInformation {
-    pub pixel_image: Arc<Image>,
-    pub pixel_image_view: Arc<ImageView>,
-    pub output_img_buf: Subbuffer<[u32]>,   
-}
-
 pub struct Renderer{
     pub world: World,
     pub view: View,
@@ -435,7 +389,7 @@ impl Renderer {
             descriptor_set_layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, self.buffers.vertex_buffer.clone()),
-                WriteDescriptorSet::buffer(1, self.buffers.vertex_depth_buffer.clone()),
+                WriteDescriptorSet::buffer(1, self.buffers.transformed_vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(2, self.buffers.transform_buffer.clone()),
                 //WriteDescriptorSet::buffer(1, transform_buffer.clone()),
                 ], 
@@ -486,8 +440,10 @@ impl Renderer {
     future.wait(None).unwrap();  // Ensures GPU completion before reading
 
 
+    // cannot find what is wrong with culling, something to do with how we compute the vector pointing to the vertex
     // let content = self.buffers.vertex_readback_buffer.read().unwrap();
     // println!("here!:");
+    // println!("{} {} {}", self.view.x,self.view.y,self.view.z);
     // for v in content.iter(){
     //     println!("{:?}", v);
     // }
@@ -779,11 +735,12 @@ impl Renderer {
                 WriteDescriptorSet::buffer(0, self.buffers.face_buffer.clone()),
                 WriteDescriptorSet::buffer(1, self.buffers.running_vertice_buffer.clone()),
                 WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
-                WriteDescriptorSet::buffer(3, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::buffer(3, self.buffers.transformed_vertex_buffer.clone()),
                 WriteDescriptorSet::buffer(4, self.buffers.depth_buffer.clone()),
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
                 WriteDescriptorSet::buffer(6, self.buffers.face_normal_buffer.clone()),
-                WriteDescriptorSet::image_view(7, self.buffers.pixel_image_view.clone()),
+                WriteDescriptorSet::buffer(7, self.buffers.vertex_buffer.clone()),
+                WriteDescriptorSet::image_view(8, self.buffers.pixel_image_view.clone()),
                 ], 
             [],
         )

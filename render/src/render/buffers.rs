@@ -40,7 +40,7 @@ pub struct Buffers {
     pub vertex_buffer: Subbuffer<[[f32; 4]]>,
     pub vertex_readback_buffer: Subbuffer<[[f32; 4]]>,
     
-    pub unified_vertex_buffer:  Subbuffer<[[f32; 4]]>,
+    pub transformed_vertex_buffer:  Subbuffer<[[f32; 4]]>,
 
     pub vertex_depth_buffer: Subbuffer<[f32]>,
 
@@ -136,10 +136,10 @@ impl Buffers {
 
 
 
-        let unified_vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+        let transformed_vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,  // Transfer destination for readback
+                usage: BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC | BufferUsage::STORAGE_BUFFER,  // Transfer destination for readback
                 ..Default::default()
             },
             AllocationCreateInfo {
@@ -516,7 +516,7 @@ impl Buffers {
             vertex_buffer,
             vertex_readback_buffer,
 
-            unified_vertex_buffer,
+            transformed_vertex_buffer,
 
             vertex_depth_buffer,
 

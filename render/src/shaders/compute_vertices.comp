@@ -10,13 +10,13 @@ layout(push_constant) uniform PushConstants {
     float screen_height;
 } push;
 
-layout(set = 0, binding = 0) buffer Data {
+layout(set = 0, binding = 0) buffer Vertices {
     vec4 data[];
-} buf;
+} vertices;
 
-layout(set = 0, binding = 1) buffer VertexDepth {
-    float data[];
-} depth_buf;
+layout(set = 0, binding = 1) buffer TransformedVertices {
+    vec4 data[];
+} transformed_vertices;
 
 layout(set = 0, binding = 2) uniform Transform {
     mat4 transformMatrix;
@@ -24,19 +24,16 @@ layout(set = 0, binding = 2) uniform Transform {
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    depth_buf.data[idx] = 1.;
+    vec4 d = transformed_vertices.data[idx];
 
-    buf.data[idx] = transform.transformMatrix * buf.data[idx];
+    transformed_vertices.data[idx] = transform.transformMatrix * vertices.data[idx];
 
-    if(buf.data[idx][3] != 0){
-        buf.data[idx][0] /= buf.data[idx][3];
-        buf.data[idx][1] /= buf.data[idx][3];
-        buf.data[idx][2] /= buf.data[idx][3];
-
+    if(transformed_vertices.data[idx][3] != 0){
+        transformed_vertices.data[idx][0] /= transformed_vertices.data[idx][3];
+        transformed_vertices.data[idx][1] /= transformed_vertices.data[idx][3];
+        transformed_vertices.data[idx][2] /= transformed_vertices.data[idx][3];
     }
 
-    buf.data[idx][0] = push.screen_width * (buf.data[idx][0] + 1.) / 2.;
-    buf.data[idx][1] = push.screen_height * (1. - buf.data[idx][1]) / 2.;
-
-
+    transformed_vertices.data[idx][0] = push.screen_width * (transformed_vertices.data[idx][0] + 1.) / 2.;
+    transformed_vertices.data[idx][1] = push.screen_height * (1. - transformed_vertices.data[idx][1]) / 2.;
 }

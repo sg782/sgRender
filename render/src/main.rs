@@ -65,7 +65,7 @@ fn main() {
 
     env::set_var("RUST_BACKTRACE", "1");
 
-    let view = View::new(0.,0.,50.,0.,0.,0.,1., WIDTH, HEIGHT);
+    let view = View::new(-100.,-100.,75.,0.,0.,0.,1., WIDTH, HEIGHT);
     let world = World::new();
     let mut renderer = Renderer::new(world,view, WIDTH, HEIGHT);
 

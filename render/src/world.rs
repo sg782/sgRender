@@ -29,9 +29,9 @@ impl World{
 
         // //test with a row of cubes
         let side_length = 5.;
-        let amount_wide = 10;
-        let amount_high = 10;
-        let amount_deep = 10;
+        let amount_wide = 40;
+        let amount_high = 40;
+        let amount_deep = 40;
         let spacing = 4.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{
@@ -65,12 +65,12 @@ impl World{
         // let v0: Vector3<f32> = Vector3::new(10.,20.,14.);
         // let v1: Vector3<f32> = Vector3::new(30.,50.,6.);
 
-        // // // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
-        // // // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
+        // // // // let v2: Vector3<f32> = Vector3::new(10.,20.,6.);
+        // // // // let v3: Vector3<f32> = Vector3::new(30.,50.,14.);
 
         // let p0 = GraphicalPlane::new(v1,v0,0xFFCC88);
 
-        // // // // // let p1 = Plane::new(v2,v3,0x3FDD88);
+        // // // // // // let p1 = Plane::new(v2,v3,0x3FDD88);
 
         // elements.push(Box::new(p0));
         // elements.push(Box::new(p1));
