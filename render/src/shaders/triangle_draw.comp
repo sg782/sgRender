@@ -32,7 +32,9 @@ layout(push_constant) uniform PushConstants {
 layout(set = 0, binding = 0) buffer Faces {
     // first 3 values are vertex indices (relative to mesh), 
     // last value is the idx of the mesh
-    uvec4 ids[];
+
+    // values grouped in fives
+    uint ids[];
 } faces;
 
 layout(set = 0, binding = 1) buffer RunningVerticeCount{
@@ -338,17 +340,17 @@ void main() {
 
     // yes i understand the following lines are redundant and inefficient, it is for testing
     uint id = idx * 16 + idy;
-    uvec4 face = faces.ids[id]; // get face
+    uint face_start = id * 5;
 
-    if(in_view.data[face[3]]==0){ // return early if not in view
+    if(in_view.data[faces.ids[face_start+4]]==0){ // return early if not in view
         return;
     }
 
 
     // get the indices of each vertex, factoring in offset from how we store the data
-    uint v_0_idx = face[0] + running_vertice_count.data[face[3]];
-    uint v_1_idx = face[1] + running_vertice_count.data[face[3]];
-    uint v_2_idx = face[2] + running_vertice_count.data[face[3]];
+    uint v_0_idx = faces.ids[face_start] + running_vertice_count.data[faces.ids[face_start+4]];
+    uint v_1_idx = faces.ids[face_start+1] + running_vertice_count.data[faces.ids[face_start+4]];
+    uint v_2_idx = faces.ids[face_start+2] + running_vertice_count.data[faces.ids[face_start+4]];
 
 
     
@@ -375,7 +377,7 @@ void main() {
     // }
 
 
-    draw_triangle(v_0_idx,v_1_idx,v_2_idx,face[3],face_normal);
+    draw_triangle(v_0_idx,v_1_idx,v_2_idx,faces.ids[face_start+4],face_normal);
 
 }
 

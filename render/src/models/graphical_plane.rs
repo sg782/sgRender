@@ -46,13 +46,13 @@ impl GraphicalPlane{
         vertices.push(Point::new(v1.x,v0.y,v1.z));
         vertices.push(Point::new(v1.x,v1.y,v1.z));
 
-        faces.push(Face::new(
+        faces.push(Face::new_three(
             0,1,2, 
             vertices[0].as_vec3(), 
             vertices[1].as_vec3(), 
             vertices[2].as_vec3()
         ));
-        faces.push(Face::new(
+        faces.push(Face::new_three(
             1,2,3, 
             vertices[1].as_vec3(), 
             vertices[2].as_vec3(), 

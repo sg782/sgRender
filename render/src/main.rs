@@ -81,7 +81,6 @@ fn main() {
     });
 
     
-    let mut light: Vector3<f32> = Vector3::new(1.,1.,1.);
     
 
     window.set_target_fps(500);

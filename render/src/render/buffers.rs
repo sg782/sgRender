@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use nalgebra::Matrix4;
 use nalgebra::Vector4;
+use nalgebra::Vector5;
 
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
@@ -58,8 +59,8 @@ pub struct Buffers {
 
 
     //faces_buffer
-    pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
-    pub face_buffer: Subbuffer<[[u32; 4]]>,
+    pub face_staging_buffer: Subbuffer<[u32]>,
+    pub face_buffer: Subbuffer<[u32]>,
 
     pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
     pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
@@ -121,7 +122,7 @@ impl Buffers {
             .iter() // Iterate over `Vec<[f32; 4]>`
             .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         
         let vertex_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
@@ -237,24 +238,27 @@ impl Buffers {
 
 
 
-        let mut face_data: Vec<Vector4<usize>> = Vec::new();
+        let mut face_data: Vec<Vector5<u32>> = Vec::new();
         let mut face_normals: Vec<Vector3<f32>> = Vec::new();
 
         for (i,mesh) in world.elements.iter().enumerate() {
             for face in mesh.faces(){
-                face_data.push(Vector4::new(
-                    face.vertex_ids[0] as usize,
-                    face.vertex_ids[1] as usize, 
-                    face.vertex_ids[2] as usize, 
-                    i
+                face_data.push(Vector5::new(
+                    face.vertex_ids[0] as u32,
+                    face.vertex_ids[1] as u32, 
+                    face.vertex_ids[2] as u32, 
+                    face.vertex_ids[3] as u32,
+                    i as u32
                 ));
                 face_normals.push(face.normal);
             }
         }
 
+        let flat_faces: Vec<u32> = face_data.iter().flat_map(|v| [v.x,v.y,v.z,v.w, v[4]]).collect();
+
         let buffer_size: u64 = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
 
-        let face_staging_buffer: Subbuffer<[[u32; 4]]> = Buffer::from_iter( 
+        let face_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
@@ -264,14 +268,12 @@ impl Buffers {
                 memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            face_data
-            .iter() // Iterate over `Vec<[f32; 4]>`
-            .map(|&v| [v[0] as u32, v[1] as u32, v[2] as u32, v[3] as u32]),
+            flat_faces
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         
-        let face_buffer: Subbuffer<[[u32; 4]]> = Buffer::new_unsized(
+        let face_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
@@ -299,7 +301,7 @@ impl Buffers {
             face_normals
             .iter() // Iterate over `Vec<[f32; 4]>`
             .map(|&v| [v[0], v[1], v[2], 0.]),
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         let face_normal_buffer: Subbuffer<[[f32;4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
@@ -334,7 +336,7 @@ impl Buffers {
             },
             color_data
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         
         let color_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
@@ -366,7 +368,7 @@ impl Buffers {
             },
             vertice_indices.iter().cloned(),
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         
         let running_vertice_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
@@ -442,7 +444,7 @@ impl Buffers {
             },
             depth_vec_a.iter().cloned(),
 
-        ).expect("failed to cretae depth buffer");
+        ).expect("failed to create depth buffer");
 
                 
         let depth_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
@@ -475,7 +477,7 @@ impl Buffers {
             },
             in_vec.iter().cloned(),
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
 
         
         let in_view_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
@@ -609,7 +611,7 @@ impl Buffers {
             .iter() // Iterate over `Vec<[f32; 4]>`
             .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
 
-        ).expect("failed to cretae staging buffer");
+        ).expect("failed to create staging buffer");
         let point_light_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {

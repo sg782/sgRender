@@ -132,6 +132,7 @@ impl Imported {
                     
                     for block in itr {
 
+
                         if block.contains("//"){
                             let face_vertex: Vec<&str> = block.split("//").collect();
                             
@@ -153,16 +154,27 @@ impl Imported {
                         
                     }
 
-                    if face_data.len()!=3 {
+                    
+                    if face_data.len() == 3 {
+                        faces.push(Face::new_from_vec_three(
+                            &face_data, 
+                            vertices[face_data[0] as usize].as_vec3(), 
+                            vertices[face_data[1] as usize].as_vec3(), 
+                            vertices[face_data[2] as usize].as_vec3()
+                        ));
+                        continue;
+                    }else if face_data.len() == 4 {
+                        faces.push(Face::new_from_vec_four(
+                            &face_data, 
+                            vertices[face_data[0] as usize].as_vec3(), 
+                            vertices[face_data[1] as usize].as_vec3(), 
+                            vertices[face_data[2] as usize].as_vec3(),
+                            vertices[face_data[3] as usize].as_vec3(),
+                        ));
                         continue;
                     }
 
-                    faces.push(Face::new_from_vec(
-                        &face_data, 
-                        vertices[face_data[0] as usize].as_vec3(), 
-                        vertices[face_data[1] as usize].as_vec3(), 
-                        vertices[face_data[2] as usize].as_vec3()
-                    ));
+                    panic!("Face must be made of 3 or 4 vertices: {:?}", face_data);
 
                 }
             }
