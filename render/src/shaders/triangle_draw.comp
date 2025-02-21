@@ -64,7 +64,11 @@ layout(set = 0, binding = 7) buffer VertexData{
     vec4 data[];
 } initial_vertex_data;
 
-layout(set = 0, binding = 8, rgba8) uniform writeonly image2D img;
+layout(set = 0, binding = 8) buffer PointLightData{
+    vec4 data[];
+} point_light_data;
+
+layout(set = 0, binding = 9, rgba8) uniform writeonly image2D img;
 
 // add in color buffer
 
@@ -290,6 +294,8 @@ void main() {
 
    // highp float t = push.current_heading[0];
     //highp float q = push.current_position[0];
+
+    vec4 li = point_light_data.data[0];
 
 
     uint idx = gl_GlobalInvocationID.x;

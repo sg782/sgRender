@@ -7,6 +7,7 @@ use vulkano::device::{Features};
 
 use vulkano::device::{ DeviceCreateInfo, QueueCreateInfo};
 
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 
 
 use vulkano::device::{Device, Queue};
@@ -19,9 +20,8 @@ use vulkano::pipeline::{ComputePipeline, PipelineShaderStageCreateInfo};
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
 use vulkano::pipeline::layout::{PipelineLayout, PipelineLayoutCreateInfo};
 use vulkano::pipeline::compute::ComputePipelineCreateInfo;
-
-
-
+use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
+use vulkano::pipeline::Pipeline;
 
 
 pub struct RenderInformation {
@@ -115,6 +115,7 @@ impl RenderInformation {
         let in_view_shader_path = "src/shaders/in_view.spv";
         let in_view_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), in_view_shader_path);
 
+
         let triangle_draw_shader_path = "src/shaders/triangle_draw.spv";
         let triangle_draw_compute_pipeline = RenderInformation::create_compute_pipeline(device.clone(), &triangle_draw_shader_path);
         
@@ -170,4 +171,32 @@ impl RenderInformation {
 
     }
 
+
+    // fn create_in_view_descriptor_set(device: Arc<Device>, compute_pipeline: Arc<ComputePipeline>) -> Arc<PersistentDescriptorSet>{
+    //     let descriptor_set_allocator =
+    //     StandardDescriptorSetAllocator::new(device.clone(), Default::default());
+
+    //     let pipeline_layout = compute_pipeline.layout();
+    //     let descriptor_set_layouts = pipeline_layout.set_layouts();
+
+    //     let descriptor_set_layout_index = 0;
+    //     let descriptor_set_layout = descriptor_set_layouts
+    //         .get(descriptor_set_layout_index)
+    //         .unwrap();
+
+    //     let descriptor_set = PersistentDescriptorSet::new(
+    //         &descriptor_set_allocator,
+    //         descriptor_set_layout.clone(),
+    //         [
+    //             WriteDescriptorSet::buffer(0, buffers.bounding_box_buffer.clone()),
+    //             WriteDescriptorSet::buffer(1,buffers.frustum_faces_buffer.clone()),
+    //             WriteDescriptorSet::buffer(2, buffers.in_view_buffer.clone()),
+    //             ], 
+    //         [],
+    //     )
+    //     .unwrap();   
+
+    //     descriptor_set
+
+    // }   
 }

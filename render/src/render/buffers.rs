@@ -7,8 +7,14 @@ use std::f32::INFINITY;
 use vulkano::image::{Image, ImageUsage, view::ImageView};
 use vulkano::format::Format;
 
+use crate::lighting::point_light::PointLight;
+
+
 use crate::world::World;
 use nalgebra::Vector3;
+use crate::view::View;
+
+use crate::plane::Plane;
 
 use std::sync::Arc;
 
@@ -24,6 +30,8 @@ use crate::render::render_information::RenderInformation;
 use vulkano::image::ImageCreateInfo;
 
 use vulkano::image::ImageType;
+
+use super::structures::FrustumFaces;
 
 
 /*
@@ -47,6 +55,7 @@ pub struct Buffers {
     // rotation transform
     pub transform_staging_buffers: Vector2<Subbuffer<Transformation>>,
     pub transform_buffer: Subbuffer<Transformation>,
+
 
     //faces_buffer
     pub face_staging_buffer: Subbuffer<[[u32; 4]]>,
@@ -74,11 +83,18 @@ pub struct Buffers {
     pub pixel_image: Arc<Image>,
     pub pixel_image_view: Arc<ImageView>,
     pub output_img_buf: Subbuffer<[u32]>,
+
+    pub frustum_faces_staging_buffers: Vector2<Subbuffer<FrustumFaces>>,
+    pub frustum_faces_buffer: Subbuffer<FrustumFaces>,
+
+    pub point_light_staging_buffer: Subbuffer<[[f32;4]]>,
+    pub point_light_buffer: Subbuffer<[[f32;4]]>,
+
     
 }
 
 impl Buffers {
-    pub fn new(render_information: &RenderInformation, world: &World, screen_width: usize, screen_height: usize) -> Buffers{
+    pub fn new(render_information: &RenderInformation, world: &World, view: &View, screen_width: usize, screen_height: usize) -> Buffers{
         
         let mut raw_vertex_data: Vec<Vector4<f32>> = Vec::new();
         // put all vertex data into one list, and decompose afterward
@@ -509,6 +525,105 @@ impl Buffers {
         ).expect("Failed to create readback buffer!");
 
 
+        let frustum_faces = &view.frustum_faces;
+
+        
+
+        let frustum_faces_staging_buffer_1:Subbuffer<FrustumFaces> = Buffer::from_data(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            FrustumFaces {
+                faces: frustum_faces.iter().map(|face:&Plane| [face.normal[0], face.normal[1], face.normal[2], face.distance])
+                    .collect::<Vec<[f32; 4]>>()
+                    .try_into()
+                    .expect("Expected exactly 6 faces"),
+            },
+        ).expect("Failed to create uniform buffer");
+
+        let frustum_faces_staging_buffer_2:Subbuffer<FrustumFaces> = Buffer::from_data(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC, // UBO usage
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
+                ..Default::default()
+            },
+            FrustumFaces {
+                faces: frustum_faces.iter().map(|face:&Plane| [face.normal[0], face.normal[1], face.normal[2], face.distance])
+                    .collect::<Vec<[f32; 4]>>()
+                    .try_into()
+                    .expect("Expected exactly 6 faces"),
+            },
+        ).expect("Failed to create uniform buffer");
+
+        let frustum_faces_staging_buffers:Vector2<Subbuffer<FrustumFaces>> = Vector2::new(
+            frustum_faces_staging_buffer_1,
+            frustum_faces_staging_buffer_2,
+        );
+        
+
+
+        let frustum_faces_buffer: Subbuffer<FrustumFaces> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            std::mem::size_of::<FrustumFaces>() as u64
+        ).expect("Failed to create storage buffer!");
+
+
+        let mut raw_point_light_data: Vec<Vector4<f32>> = Vec::new();
+        // put all vertex data into one list, and decompose afterward
+        for point_light in &world.lights.point_lights {
+            raw_point_light_data.push(point_light.as_vec_4());
+        }
+
+
+        let buffer_size = (raw_point_light_data.len() * std::mem::size_of::<[f32; 4]>()) as u64; // Total buffer size in bytes
+
+        let point_light_staging_buffer: Subbuffer<[[f32; 4]]> = Buffer::from_iter( 
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            raw_point_light_data
+            .iter() // Iterate over `Vec<[f32; 4]>`
+            .map(|&v| [v[0] as f32, v[1] as f32, v[2] as f32, v[3] as f32]),
+
+        ).expect("failed to cretae staging buffer");
+        let point_light_buffer: Subbuffer<[[f32; 4]]> = Buffer::new_unsized(
+            render_information.memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            buffer_size
+        ).expect("Failed to create storage buffer!");
+
+
 
         // buffer encapsulation struct
         let buffers = Buffers {
@@ -548,7 +663,11 @@ impl Buffers {
             pixel_image_view,
             output_img_buf,
 
+            frustum_faces_staging_buffers,
+            frustum_faces_buffer,
 
+            point_light_buffer,
+            point_light_staging_buffer,
         };
 
         buffers

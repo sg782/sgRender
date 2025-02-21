@@ -1,7 +1,10 @@
 
 use nalgebra::Vector3;
 
+use crate::lighting::directional_light::{self, DirectionalLight};
+use crate::lighting::point_light::{self, PointLight};
 use crate::mesh::mesh::Mesh;
+use crate::mesh::point;
 use crate::models::cube::Cube;
 use crate::models::rect_prism::RectPrism;
 
@@ -9,8 +12,14 @@ use crate::models::graphical_plane::GraphicalPlane;
 
 use crate::models::imported::Imported;
 
+pub struct Lights {
+    pub directional_lights: Vec<DirectionalLight>,
+    pub point_lights: Vec<PointLight>,
+}
+
 pub struct World{
     pub elements: Vec<Box<dyn Mesh>>,
+    pub lights: Lights,
     pub idx_vec_running: Vec<u32>,
 }
 
@@ -24,14 +33,23 @@ impl World{
         you can also make a custom shape of any kind if you implement it with 'mesh' traits
          */
 
+        let mut directional_lights = Vec::new();
+        let mut point_lights = Vec::new();
+
+        point_lights.push(PointLight::new(Vector3::new(10.,10.,10.), 0.9));
+
+        let lights = Lights {
+            directional_lights,
+            point_lights,
+        };
 
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
         let side_length = 5.;
-        let amount_wide = 3;
-        let amount_high = 3;
-        let amount_deep = 3;
+        let amount_wide = 1;
+        let amount_high = 1;
+        let amount_deep = 1;
         let spacing = 4.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{
@@ -114,7 +132,7 @@ impl World{
 
 
         World {
-            elements, idx_vec_running,
+            elements, lights, idx_vec_running,
         }
     }
 

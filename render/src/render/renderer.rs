@@ -97,7 +97,7 @@ impl Renderer {
         let render_information = RenderInformation::new();
 
 
-        let buffers = Buffers::new(&render_information, &world, screen_width, screen_height);
+        let buffers = Buffers::new(&render_information, &world, &view,  screen_width, screen_height);
 
         let frame_count = 0;
 
@@ -182,7 +182,14 @@ impl Renderer {
     pub fn render(& mut self, window: &mut Window){
         self.frame_count += 1;
 
-        self.sort_faces_by_tiles();
+
+
+        self.calculate_in_view();
+
+
+
+
+        //self.sort_faces_by_tiles();
         self.compute_vertex_screen_coordinates();
 
         if(self.is_drawing_faces){
@@ -462,7 +469,6 @@ impl Renderer {
 
     fn draw_wireframe(&self, window: &mut Window) {
 
-        self.calculate_in_view();
 
         let image = Image::new(
             self.render_information.memory_allocator.clone(),
@@ -603,43 +609,23 @@ impl Renderer {
 
         // println!("Time elapsed in compute vertex_ {}", elapsed);
 
+        
+
+        let mut frustum_content = self.buffers.frustum_faces_staging_buffers[(self.frame_count%2) as usize].write().unwrap();
 
         let frustum_faces = &self.view.frustum_faces;
 
-        let frustum_faces_staging_buffer:Subbuffer<FrustumFaces> = Buffer::from_data(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC, // UBO usage
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::HOST_SEQUENTIAL_WRITE | MemoryTypeFilter::PREFER_HOST, // Writable memory
-                ..Default::default()
-            },
-            FrustumFaces {
-                faces: frustum_faces.iter().map(|face:&Plane| [face.normal[0], face.normal[1], face.normal[2], face.distance])
-                    .collect::<Vec<[f32; 4]>>()
-                    .try_into()
-                    .expect("Expected exactly 6 faces"),
-            },
-        ).expect("Failed to create uniform buffer");
 
+        *frustum_content = FrustumFaces {
+            faces: frustum_faces.iter()
+                .map(|face: &Plane| [face.normal[0], face.normal[1], face.normal[2], face.distance])
+                .collect::<Vec<[f32; 4]>>()
+                .try_into()
+                .expect("Expected exactly 6 faces"),
+        };
 
-        let frustum_faces_buffer: Subbuffer<FrustumFaces> = Buffer::new_unsized(
-            self.render_information.memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            std::mem::size_of::<FrustumFaces>() as u64
-        ).expect("Failed to create storage buffer!");
+        let now = Instant::now();
 
-
-    
         
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
@@ -665,7 +651,7 @@ impl Renderer {
             descriptor_set_layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, self.buffers.bounding_box_buffer.clone()),
-                WriteDescriptorSet::buffer(1,frustum_faces_buffer.clone()),
+                WriteDescriptorSet::buffer(1,self.buffers.frustum_faces_buffer.clone()),
                 WriteDescriptorSet::buffer(2, self.buffers.in_view_buffer.clone()),
                 ], 
             [],
@@ -673,10 +659,16 @@ impl Renderer {
         .unwrap();     
 
 
+        let elapsed = now.elapsed().as_nanos();
+
+        println!("Time elapsed in compute vertex_ {}", elapsed);
+
+
+
         command_buffer_builder
             .copy_buffer(CopyBufferInfo::buffers(self.buffers.bounding_box_staging_buffer.clone(), self.buffers.bounding_box_buffer.clone()))
                 .unwrap()
-            .copy_buffer(CopyBufferInfo::buffers(frustum_faces_staging_buffer.clone(), frustum_faces_buffer.clone()))
+            .copy_buffer(CopyBufferInfo::buffers(self.buffers.frustum_faces_staging_buffers[((self.frame_count+1)%2) as usize].clone(), self.buffers.frustum_faces_buffer.clone()))
                 .unwrap()
             .bind_pipeline_compute(self.render_information.in_view_compute_pipeline.clone())
             .   unwrap()
@@ -702,17 +694,16 @@ impl Renderer {
         .unwrap();
     
     future.wait(None).unwrap();  // Ensures GPU completion before reading
+
+
         
+
+
+
     }
 
 
     fn draw_faces(&self, window: &mut Window){
-
-
-
-        self.calculate_in_view();
-
-
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             &self.render_information.command_buffer_allocator,
@@ -747,7 +738,8 @@ impl Renderer {
                 WriteDescriptorSet::buffer(5, self.buffers.color_buffer.clone()),
                 WriteDescriptorSet::buffer(6, self.buffers.face_normal_buffer.clone()),
                 WriteDescriptorSet::buffer(7, self.buffers.vertex_buffer.clone()),
-                WriteDescriptorSet::image_view(8, self.buffers.pixel_image_view.clone()),
+                WriteDescriptorSet::buffer(8, self.buffers.point_light_buffer.clone()),
+                WriteDescriptorSet::image_view(9, self.buffers.pixel_image_view.clone()),
                 ], 
             [],
         )
@@ -770,6 +762,8 @@ impl Renderer {
         CopyBufferInfo::buffers(self.buffers.color_staging_buffer.clone(), self.buffers.color_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.depth_staging_buffer.clone(), self.buffers.depth_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.face_normal_staging_buffer.clone(), self.buffers.face_normal_buffer.clone()),
+        CopyBufferInfo::buffers(self.buffers.point_light_staging_buffer.clone(), self.buffers.point_light_buffer.clone()),
+
        ];
 
        for copy_op in copy_operations{
