@@ -624,7 +624,7 @@ impl Renderer {
                 .expect("Expected exactly 6 faces"),
         };
 
-        let now = Instant::now();
+        // let now = Instant::now();
 
         
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
@@ -659,9 +659,9 @@ impl Renderer {
         .unwrap();     
 
 
-        let elapsed = now.elapsed().as_nanos();
+        // let elapsed = now.elapsed().as_nanos();
 
-        println!("Time elapsed in compute vertex_ {}", elapsed);
+        // println!("Time elapsed in compute vertex_ {}", elapsed);
 
 
 
@@ -763,7 +763,6 @@ impl Renderer {
         CopyBufferInfo::buffers(self.buffers.depth_staging_buffer.clone(), self.buffers.depth_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.face_normal_staging_buffer.clone(), self.buffers.face_normal_buffer.clone()),
         CopyBufferInfo::buffers(self.buffers.point_light_staging_buffer.clone(), self.buffers.point_light_buffer.clone()),
-
        ];
 
        for copy_op in copy_operations{

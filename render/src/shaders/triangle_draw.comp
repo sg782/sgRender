@@ -245,6 +245,34 @@ void draw_full_half_space_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, high
     }
 }
 
+float calculate_intensity(vec3 normal){
+    float ambient_light = 0.3;
+
+    float final_intensity = ambient_light;
+
+    uint idx = gl_GlobalInvocationID.x;
+    uint idy = gl_GlobalInvocationID.y;
+    uint id = idx * 16 + idy;
+
+    int num_points = 2;
+    // assuming point lights
+    for(int i=0;i<num_points;i++){
+        vec3 vec_to_face = point_light_data.data[i].xyz - initial_vertex_data.data[id].xyz;
+
+        highp float vec_dot = dot(vec_to_face,normal);
+        highp float combined_magnitudes = length(vec_to_face) * length(normal);
+        highp float intensity_scalar = vec_dot / combined_magnitudes;
+        intensity_scalar = max(intensity_scalar,0.);
+
+        final_intensity += intensity_scalar;
+        if(final_intensity>=1.){
+            return 1.;
+        }
+    }
+
+    return min(final_intensity,1.);
+}
+
 
 void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 normal){
 
@@ -270,26 +298,33 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 
 
 
     // manually define a point light at 0,0,0;
-    highp float initial_intensity = 1.0;
-    vec3 directional_light = vec3(1.,1.,1.);
+    // highp float initial_intensity = 1.0;
+    // vec3 directional_light = vec3(1.,1.,1.);
 
-    vec3 reflected_light = -1. * directional_light;
+    // vec3 reflected_light = -1. * directional_light;
 
-    highp float vec_dot = dot(float_normal, reflected_light);
-    highp float combined_magnitudes = length(float_normal) * length(reflected_light);
-    highp float intensity_scalar = vec_dot / combined_magnitudes;
-    if(intensity_scalar<0){
-        intensity_scalar = 0.;
-    }
+    // highp float vec_dot = dot(float_normal, reflected_light);
+    // highp float combined_magnitudes = length(float_normal) * length(reflected_light);
+    // highp float intensity_scalar = vec_dot / combined_magnitudes;
 
-    highp float intermediate_intensity = initial_intensity * intensity_scalar; // this is final intensity if we have now ambient light
-    highp float final_intensity = min(intermediate_intensity + 0.3,1.); // add in some ambient light
+    // intensity_scalar = max(intensity_scalar,0.);
+    // // if(intensity_scalar<0){
+    // //     intensity_scalar = 0.;
+    // // }
+
+    // highp float intermediate_intensity = initial_intensity * intensity_scalar; // this is final intensity if we have now ambient light
+    // highp float final_intensity = min(intermediate_intensity + 0.3,1.); // add in some ambient light
+
+    highp float final_intensity = calculate_intensity(float_normal);
 
     draw_full_half_space_triangle(v0, v1, v2, face_id, final_intensity);
 
     return;
 
 }
+
+
+
 void main() {
 
    // highp float t = push.current_heading[0];

@@ -36,7 +36,10 @@ impl World{
         let mut directional_lights = Vec::new();
         let mut point_lights = Vec::new();
 
-        point_lights.push(PointLight::new(Vector3::new(10.,10.,10.), 0.9));
+        point_lights.push(PointLight::new(Vector3::new(0.,20.,0.), 0.3));
+
+        point_lights.push(PointLight::new(Vector3::new(0.,-20.,0.), 0.5));
+
 
         let lights = Lights {
             directional_lights,
@@ -47,10 +50,10 @@ impl World{
 
         // //test with a row of cubes
         let side_length = 5.;
-        let amount_wide = 1;
-        let amount_high = 1;
-        let amount_deep = 1;
-        let spacing = 4.;
+        let amount_wide = 10;
+        let amount_high = 10;
+        let amount_deep = 10;
+        let spacing = 10.;
         let mut count: f32 = 0.;
         for i in 0..amount_wide{
             for j in 0..amount_high{
@@ -97,9 +100,9 @@ impl World{
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer
         //https://www.gabrielgambetta.com/computer-graphics-from-scratch/03-light.html
         
-        // let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
+        let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
         
-        // elements.push(Box::new(teapot));
+        elements.push(Box::new(teapot));
 
         // let sphere = Imported::new("../../3d_models/sphere/source/Archive/sphere.obj",10.,0.,0.,0.);
         // elements.push(Box::new(sphere));
