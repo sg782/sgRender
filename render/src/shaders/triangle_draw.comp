@@ -200,26 +200,6 @@ void draw_full_half_space_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, high
             }
 
             highp float intermediate_depth = v0[3] + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
-
-
-            /*
-            CURRENTLY CONVERTING TO ATOMIC
-
-
-            */
-
-         
-            // race condition causes severe flickering
-
-            // CHANGE: do this operation atomically, then atomically check if depth_buf.depth[id] == intermediate_depth, when drawing
-            // reduces framerate quite a bit, but produces a better output
-
-            // if(depth_buffer.data[int_i * int(push.screen_width) + int_j] < floatBitsToUint(intermediate_depth)){
-            //     continue;
-            // }else{
-            //     depth_buffer.data[int_i * int(push.screen_width) + int_j] = floatBitsToUint(intermediate_depth);
-            // }
-
             
             atomicMin(depth_buffer.data[int_i * int(push.screen_width) + int_j], floatBitsToUint(intermediate_depth));
 
@@ -230,18 +210,85 @@ void draw_full_half_space_triangle(vec4 v0, vec4 v1, vec4 v2, uint face_id, high
             imageStore(img, coord, to_write);   
                 continue;
             }
+
+        }
+    }
+}
+
+void draw_quad(vec4 v0, vec4 v1, vec4 v2, vec4 v3, uint face_id,  highp float light_intensity){
+    highp float min_x = min(v0[0],min(v1[0],min(v2[0],v3[0])));
+    highp float max_x = max(v0[0],max(v1[0],max(v2[0], v3[0])));
+
+    highp float min_y = min(v0[1],min(v1[1],min(v2[1], v3[1])));
+    highp float max_y = max(v0[1],max(v1[1],min(v2[1], v3[1])));
+
+    // three points define a plane
+    vec3 v_top = vec3(v0.xy,v0.w);
+    vec3 v_left = vec3(v1.xy,v1.w);
+    vec3 v_right = vec3(v2.xy,v2.w);
+    vec3 a = v_left - v_top;
+    vec3 b = v_right - v_top;
+
+    vec3 screen_normal = normalize(cross(b,a)); // cull from here
+
+
+
+    
+    highp float dz_dy = (screen_normal.z != 0) ? (-screen_normal.y / screen_normal.z) : 0.0f;
+    highp float dz_dx = (screen_normal.z != 0) ? (-screen_normal.x / screen_normal.z) : 0.0f;
+
+
+
+    uint c = color_buffer.data[face_id];
+
+    // extract each color data
+    vec4 color = uvec4(
+        float((c >> 16) & 0xFF),
+        float((c >> 8) & 0xFF),
+        float(c & 0xFF),
+        0
+    );
+
+    for(highp float id = min_y; id <= max_y;id++){
+        for(highp float jd = min_x; jd <= max_x; jd++){
+
+            highp float i = clamp(id,0,push.screen_height-1);
+            highp float j = clamp(jd,0,push.screen_width-1);
             
+
+            // if(i < 0. || i >= push.screen_height || j < 0. || j >= push.screen_width){
+            //     continue;
+            // }
+
+            uint int_i = int(i);
+            uint int_j = int(j);
+
+
+            vec2 pixel_pos = vec2(j,i);
+
+
+            highp float alpha = get_determinant(v0.xy, v1.xy,pixel_pos);
+            highp float beta = get_determinant(v1.xy,v2.xy,pixel_pos);
+            highp float omega = get_determinant(v2.xy,v3.xy,pixel_pos);
+            highp float gamma = get_determinant(v3.xy,v0.xy, pixel_pos);
             
-            // vec4 to_write = color / 255;
-            // to_write *= light_intensity;
-            // ivec2 coord = ivec2(int_j,int_i);
-            // imageStore(img, coord, to_write);   
-            // ivec2 coord2 = ivec2(int_j,int_i+1);
-            // imageStore(img, coord2, to_write);   
-            // ivec2 coord3 = ivec2(int_j+1,int_i);
-            // imageStore(img, coord3, to_write);   
-            // ivec2 coord4 = ivec2(int_j+1,int_i+1);
-            // imageStore(img, coord4, to_write);   
+
+
+            if(alpha<0. || beta < 0. || omega <0. || gamma <0.){
+                continue;
+            }
+
+            highp float intermediate_depth = v0[3] + ((i - v0[1]) * dz_dy) + ((j - v0[0]) * dz_dx);
+            
+            atomicMin(depth_buffer.data[int_i * int(push.screen_width) + int_j], floatBitsToUint(intermediate_depth));
+
+            if (depth_buffer.data[int_i * int(push.screen_width) + int_j] == floatBitsToUint(intermediate_depth)){
+            vec4 to_write = color / 255;
+            to_write *= light_intensity;
+            ivec2 coord = ivec2(int_j,int_i);
+            imageStore(img, coord, to_write);   
+                continue;
+            }
 
         }
     }
@@ -276,7 +323,7 @@ float calculate_intensity(vec3 normal){
 }
 
 
-void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 normal){
+void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint v_d_idx, uint face_id, vec3 normal){
 
     vec4 va = floor(transformed_vertex_data.data[v_a_idx]);
     vec4 vb = floor(transformed_vertex_data.data[v_b_idx]);
@@ -296,26 +343,6 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint face_id, vec3 
     vec4 v0 = outp[0];
     vec4 v1 = outp[1];
     vec4 v2 = outp[2];
-
-
-
-    // manually define a point light at 0,0,0;
-    // highp float initial_intensity = 1.0;
-    // vec3 directional_light = vec3(1.,1.,1.);
-
-    // vec3 reflected_light = -1. * directional_light;
-
-    // highp float vec_dot = dot(float_normal, reflected_light);
-    // highp float combined_magnitudes = length(float_normal) * length(reflected_light);
-    // highp float intensity_scalar = vec_dot / combined_magnitudes;
-
-    // intensity_scalar = max(intensity_scalar,0.);
-    // // if(intensity_scalar<0){
-    // //     intensity_scalar = 0.;
-    // // }
-
-    // highp float intermediate_intensity = initial_intensity * intensity_scalar; // this is final intensity if we have now ambient light
-    // highp float final_intensity = min(intermediate_intensity + 0.3,1.); // add in some ambient light
 
     highp float final_intensity = calculate_intensity(float_normal);
 
@@ -351,6 +378,8 @@ void main() {
     uint v_0_idx = faces.ids[face_start] + running_vertice_count.data[faces.ids[face_start+4]];
     uint v_1_idx = faces.ids[face_start+1] + running_vertice_count.data[faces.ids[face_start+4]];
     uint v_2_idx = faces.ids[face_start+2] + running_vertice_count.data[faces.ids[face_start+4]];
+    uint v_3_idx = faces.ids[face_start+3] + running_vertice_count.data[faces.ids[face_start+4]];
+
 
 
     
@@ -376,8 +405,8 @@ void main() {
     //     return;
     // }
 
+    draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
 
-    draw_triangle(v_0_idx,v_1_idx,v_2_idx,faces.ids[face_start+4],face_normal);
 
 }
 
