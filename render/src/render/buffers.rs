@@ -59,8 +59,8 @@ pub struct Buffers {
 
 
     //faces_buffer
-    pub face_staging_buffer: Subbuffer<[u32]>,
-    pub face_buffer: Subbuffer<[u32]>,
+    pub face_staging_buffer: Subbuffer<[i32]>,
+    pub face_buffer: Subbuffer<[i32]>,
 
     pub face_normal_staging_buffer: Subbuffer<[[f32;4]]>,
     pub face_normal_buffer: Subbuffer<[[f32; 4]]>,
@@ -69,8 +69,8 @@ pub struct Buffers {
     pub color_buffer: Subbuffer<[u32]>,
 
     // running vertices
-    pub running_vertice_staging_buffer: Subbuffer<[u32]>,
-    pub running_vertice_buffer: Subbuffer<[u32]>,
+    pub running_vertice_staging_buffer: Subbuffer<[i32]>,
+    pub running_vertice_buffer: Subbuffer<[i32]>,
 
     pub bounding_box_staging_buffer: Subbuffer<[BoundingPoint]>,
     pub bounding_box_buffer: Subbuffer<[BoundingPoint]>,
@@ -238,27 +238,27 @@ impl Buffers {
 
 
 
-        let mut face_data: Vec<Vector5<u32>> = Vec::new();
+        let mut face_data: Vec<Vector5<i32>> = Vec::new();
         let mut face_normals: Vec<Vector3<f32>> = Vec::new();
 
         for (i,mesh) in world.elements.iter().enumerate() {
             for face in mesh.faces(){
                 face_data.push(Vector5::new(
-                    face.vertex_ids[0] as u32,
-                    face.vertex_ids[1] as u32, 
-                    face.vertex_ids[2] as u32, 
-                    face.vertex_ids[3] as u32,
-                    i as u32
+                    face.vertex_ids[0] as i32,
+                    face.vertex_ids[1] as i32, 
+                    face.vertex_ids[2] as i32, 
+                    face.vertex_ids[3] as i32,
+                    i as i32
                 ));
                 face_normals.push(face.normal);
             }
         }
 
-        let flat_faces: Vec<u32> = face_data.iter().flat_map(|v| [v.x,v.y,v.z,v.w, v[4]]).collect();
+        let flat_faces: Vec<i32> = face_data.iter().flat_map(|v| [v.x,v.y,v.z,v.w, v[4]]).collect();
 
         let buffer_size: u64 = (face_data.len() * std::mem::size_of::<[usize; 4]>()) as u64; // Total buffer size in bytes
 
-        let face_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+        let face_staging_buffer: Subbuffer<[i32]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
@@ -272,8 +272,15 @@ impl Buffers {
 
         ).expect("failed to create staging buffer");
 
+        // let content = face_staging_buffer.clone();
+        // println!("here!:");
+        // for v in content.read().unwrap().iter(){
+        //     println!("{:?}", v);
+        // }
+
+
         
-        let face_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+        let face_buffer: Subbuffer<[i32]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,
@@ -356,7 +363,7 @@ impl Buffers {
 
         let vertice_indices = &world.idx_vec_running;
 
-        let running_vertice_staging_buffer: Subbuffer<[u32]> = Buffer::from_iter( 
+        let running_vertice_staging_buffer: Subbuffer<[i32]> = Buffer::from_iter( 
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
@@ -370,8 +377,15 @@ impl Buffers {
 
         ).expect("failed to create staging buffer");
 
+        // let content = running_vertice_staging_buffer.clone();
+        // println!("here!:");
+        // for v in content.read().unwrap().iter(){
+        //     println!("{:?}", v);
+        // }
+
+
         
-        let running_vertice_buffer: Subbuffer<[u32]> = Buffer::new_unsized(
+        let running_vertice_buffer: Subbuffer<[i32]> = Buffer::new_unsized(
             render_information.memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST | BufferUsage::TRANSFER_SRC,

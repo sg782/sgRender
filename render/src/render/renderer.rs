@@ -454,7 +454,6 @@ impl Renderer {
     future.wait(None).unwrap();  // Ensures GPU completion before reading
 
 
-    // cannot find what is wrong with culling, something to do with how we compute the vector pointing to the vertex
     // let content = self.buffers.vertex_readback_buffer.read().unwrap();
     // println!("here!:");
     // println!("{} {} {}", self.view.x,self.view.y,self.view.z);

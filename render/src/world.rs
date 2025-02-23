@@ -20,7 +20,7 @@ pub struct Lights {
 pub struct World{
     pub elements: Vec<Box<dyn Mesh>>,
     pub lights: Lights,
-    pub idx_vec_running: Vec<u32>,
+    pub idx_vec_running: Vec<i32>,
 }
 
 impl World{
@@ -49,33 +49,33 @@ impl World{
         let mut elements: Vec<Box<dyn Mesh>> = Vec::new();
 
         // //test with a row of cubes
-        // let side_length = 5.;
-        // let amount_wide = 10;
-        // let amount_high = 10;
-        // let amount_deep = 10;
-        // let spacing = 10.;
-        // let mut count: f32 = 0.;
-        // for i in 0..amount_wide{
-        //     for j in 0..amount_high{
-        //         for k in 0..amount_deep{
-        //             count +=1.;
-        //             let idx = i as f32;
-        //             let jdx = j as f32;
-        //             let kdx = k as f32;
-        //             let r = 4.* (4.1+kdx);
-        //             //let cube = Cube::new(r * idx,jdx * jdx, r * kdx, side_length, 0xA028 * count as u32);
-        //             let cube = Cube::new(idx * (side_length + spacing),jdx * (side_length + spacing), kdx * (side_length + spacing), side_length-1., 0xC028 * count as u32);
+        let side_length = 5.;
+        let amount_wide = 2;
+        let amount_high = 2;
+        let amount_deep = 2;
+        let spacing = 10.;
+        let mut count: f32 = 0.;
+        for i in 0..amount_wide{
+            for j in 0..amount_high{
+                for k in 0..amount_deep{
+                    count +=1.;
+                    let idx = i as f32;
+                    let jdx = j as f32;
+                    let kdx = k as f32;
+                    let r = 4.* (4.1+kdx);
+                    //let cube = Cube::new(r * idx,jdx * jdx, r * kdx, side_length, 0xA028 * count as u32);
+                    let cube = Cube::new(idx * (side_length + spacing),jdx * (side_length + spacing), kdx * (side_length + spacing), side_length-1., 0xC028 * count as u32);
 
-        //             // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
+                    // let teapot = Imported::new("../../3d_models/teapot.obj",side_length,idx * side_length, jdx * side_length, kdx*side_length);
 
-        //             // elements.push(Box::new(teapot));
+                    // elements.push(Box::new(teapot));
 
-        //             elements.push(Box::new(cube));
+                    elements.push(Box::new(cube));
 
-        //         }
+                }
 
-        //     }
-        // }
+            }
+        }
 
 
         // let prism = RectPrism::new(0.,0.,0.,10.,2.,2.5, 0x00FF00);
@@ -100,12 +100,12 @@ impl World{
         //https://www.thkp.co/blog/2020/2/5/rendering-3d-from-scratch-chapter-7-the-depth-buffer
         //https://www.gabrielgambetta.com/computer-graphics-from-scratch/03-light.html
         
-        let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
+        // let teapot = Imported::new("../../3d_models/teapot.obj",10.,0.,0.,0.);
         
-        elements.push(Box::new(teapot));
+        // elements.push(Box::new(teapot));
 
-        let sphere = Imported::new("../../3d_models/sphere/source/Archive/sphere.obj",10.,15.,0.,0.);
-        elements.push(Box::new(sphere));
+        // let sphere = Imported::new("../../3d_models/sphere/source/Archive/sphere.obj",1.,15.,0.,0.);
+        // elements.push(Box::new(sphere));
 
         // let g: f32 = 1.22/2.;
         // let x_pt = g.tan();
@@ -126,11 +126,11 @@ impl World{
         
         let mut running_total = 0;
 
-        let mut idx_vec_running: Vec<u32> = Vec::new();    
+        let mut idx_vec_running: Vec<i32> = Vec::new();    
 
         for mesh in &elements {
             idx_vec_running.push(running_total);
-            running_total += mesh.num_vertices() as u32;
+            running_total += mesh.num_vertices() as i32;
         }
 
 

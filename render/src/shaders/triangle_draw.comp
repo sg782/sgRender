@@ -34,11 +34,11 @@ layout(set = 0, binding = 0) buffer Faces {
     // last value is the idx of the mesh
 
     // values grouped in fives
-    uint ids[];
+    int ids[];
 } faces;
 
 layout(set = 0, binding = 1) buffer RunningVerticeCount{
-    uint data[];
+    int data[];
 } running_vertice_count;
 
 layout(set = 0, binding = 2) buffer InView {
@@ -349,7 +349,7 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint v_d_idx, uint 
 
     draw_full_half_space_triangle(v0, v1, v2, face_id, final_intensity);
 
-    return;
+    //return;
 
 }
 
@@ -376,10 +376,10 @@ void main() {
 
 
     // get the indices of each vertex, factoring in offset from how we store the data
-    uint v_0_idx = faces.ids[face_start] + running_vertice_count.data[faces.ids[face_start+4]];
-    uint v_1_idx = faces.ids[face_start+1] + running_vertice_count.data[faces.ids[face_start+4]];
-    uint v_2_idx = faces.ids[face_start+2] + running_vertice_count.data[faces.ids[face_start+4]];
-    uint v_3_idx = faces.ids[face_start+3] + running_vertice_count.data[faces.ids[face_start+4]];
+    int v_0_idx = faces.ids[face_start] + running_vertice_count.data[faces.ids[face_start+4]];
+    int v_1_idx = faces.ids[face_start+1] + running_vertice_count.data[faces.ids[face_start+4]];
+    int v_2_idx = faces.ids[face_start+2] + running_vertice_count.data[faces.ids[face_start+4]];
+    int v_3_idx = faces.ids[face_start+3] + running_vertice_count.data[faces.ids[face_start+4]];
 
 
 
@@ -408,7 +408,7 @@ void main() {
 
 
     // avoids needing to draw it as a quadrilateral if 4 vertices. Eventually ill complete the quad alg but i dont want to waste time doin dat rn
-    if(v_3_idx==-1){
+    if(faces.ids[face_start+3]==-1){ //4294967295 is -1 as u32
         draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
     }else{
         draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
