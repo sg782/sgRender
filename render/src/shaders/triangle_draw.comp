@@ -346,6 +346,7 @@ void draw_triangle(uint v_a_idx, uint v_b_idx, uint v_c_idx, uint v_d_idx, uint 
 
     highp float final_intensity = calculate_intensity(float_normal);
 
+
     draw_full_half_space_triangle(v0, v1, v2, face_id, final_intensity);
 
     return;
@@ -405,7 +406,15 @@ void main() {
     //     return;
     // }
 
-    draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
+
+    // avoids needing to draw it as a quadrilateral if 4 vertices. Eventually ill complete the quad alg but i dont want to waste time doin dat rn
+    if(v_3_idx==-1){
+        draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
+    }else{
+        draw_triangle(v_0_idx,v_1_idx,v_2_idx, v_3_idx, faces.ids[face_start+4],face_normal);
+        draw_triangle(v_0_idx,v_2_idx,v_3_idx, v_3_idx, faces.ids[face_start+4],face_normal);
+    }
+
 
 
 }
