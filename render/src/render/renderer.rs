@@ -192,7 +192,7 @@ impl Renderer {
         //self.sort_faces_by_tiles();
         self.compute_vertex_screen_coordinates();
 
-        if(self.is_drawing_faces){
+        if self.is_drawing_faces {
             self.draw_faces(window);
         }else{
             self.draw_wireframe(window);

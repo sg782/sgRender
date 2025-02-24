@@ -38,7 +38,7 @@ impl World{
 
         point_lights.push(PointLight::new(Vector3::new(0.,0.,1000.), 0.3));
 
-        point_lights.push(PointLight::new(Vector3::new(0.,-20.,0.), 0.5));
+        point_lights.push(PointLight::new(Vector3::new(0.,-20.,0.), 0.1));
 
 
         let lights = Lights {
