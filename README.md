@@ -1,4 +1,4 @@
 # sgRender
 3d renderer in rust for learning purposes
 
-frustrating how much boilerplate seems to be needed for GPU acceleration
+I am not dedicated to having clean code here, I just want to learn about 3d graphics :)
